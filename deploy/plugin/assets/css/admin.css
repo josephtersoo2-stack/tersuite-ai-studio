@@ -1,0 +1,28 @@
+/* Tersuite AI Studio Plugin Generator - Admin Styles */
+.tersuite-dashboard .stat-box {
+    display: inline-block;
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    padding: 20px;
+    margin-right: 15px;
+    min-width: 150px;
+    border-radius: 4px;
+}
+.tersuite-dashboard .stat-box h3 {
+    margin: 0 0 5px;
+    font-size: 24px;
+    color: #2271b1;
+}
+.tersuite-dashboard .button-hero {
+    font-size: 16px;
+    padding: 12px 24px;
+    margin: 20px 0;
+}
+.status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    background: #dff0d8;
+    color: #3c763d;
+    border-radius: 12px;
+    font-size: 12px;
+}

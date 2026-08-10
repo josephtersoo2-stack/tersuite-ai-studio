@@ -1,0 +1,99 @@
+version: "3.9"
+
+services:
+  # Django Backend
+  backend:
+    build: ./backend
+    container_name: tersuite_backend
+    command: gunicorn core.asgi:application -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --timeout 300
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=False
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    networks:
+      - tersuite_net
+
+  # PostgreSQL Database
+  db:
+    image: postgres:16
+    container_name: tersuite_db
+    environment:
+      POSTGRES_DB: tersuite
+      POSTGRES_USER: tersuite_user
+      POSTGRES_PASSWORD: secure_password_change_me
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - tersuite_net
+
+  # Redis for Celery + Channels
+  redis:
+    image: redis:7-alpine
+    container_name: tersuite_redis
+    networks:
+      - tersuite_net
+
+  # Celery Worker (concurrent agent tasks)
+  celery_worker:
+    build: ./backend
+    container_name: tersuite_celery
+    command: celery -A core worker --loglevel=info --concurrency=4
+    volumes:
+      - ./backend:/app
+    environment:
+      - DB_HOST=db
+      - REDIS_HOST=redis
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - backend
+      - redis
+      - db
+    networks:
+      - tersuite_net
+
+  # MicroVM Sandbox (Firecracker-based isolation for plugin testing)
+  # Note: In production, use Kata Containers or Firecracker microVMs
+  sandbox:
+    image: wordpress:php8.2
+    container_name: tersuite_sandbox
+    environment:
+      WORDPRESS_DB_HOST: sandbox_db
+      WORDPRESS_DB_USER: wp_user
+      WORDPRESS_DB_PASSWORD: wp_pass
+      WORDPRESS_DB_NAME: wp_test
+    volumes:
+      - ./sandbox/templates:/var/www/html/wp-content/plugins/test-plugin
+    networks:
+      - tersuite_net
+    # Note: For true microVM isolation, replace with Firecracker/Kata runtime
+
+  # Sandbox Database (isolated from main DB)
+  sandbox_db:
+    image: mariadb:11
+    container_name: tersuite_sandbox_db
+    environment:
+      MYSQL_DATABASE: wp_test
+      MYSQL_USER: wp_user
+      MYSQL_PASSWORD: wp_pass
+      MYSQL_ROOT_PASSWORD: root_pass
+    volumes:
+      - sandbox_db_data:/var/lib/mysql
+    networks:
+      - tersuite_net
+
+volumes:
+  postgres_data:
+  sandbox_db_data:
+
+networks:
+  tersuite_net:
+    driver: bridge
