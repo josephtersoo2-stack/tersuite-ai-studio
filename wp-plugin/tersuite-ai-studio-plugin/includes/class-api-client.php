@@ -93,9 +93,15 @@ class Tersuite_AI_API_Client {
         $decoded     = json_decode($raw_body, true);
 
         if ($status_code < 200 || $status_code >= 300) {
-            $error_msg = is_array($decoded) && isset($decoded['message'])
-                ? $decoded['message']
-                : sprintf(__('Backend returned HTTP status code %d.', 'tersuite-ai-studio'), $status_code);
+            $error_msg = sprintf(__('Backend returned HTTP status code %d.', 'tersuite-ai-studio'), $status_code);
+            if (is_array($decoded)) {
+                foreach (array('message', 'detail', 'error', 'error_description') as $key) {
+                    if (isset($decoded[$key]) && is_scalar($decoded[$key]) && (string) $decoded[$key] !== '') {
+                        $error_msg = (string) $decoded[$key];
+                        break;
+                    }
+                }
+            }
 
             return new WP_Error(
                 'backend_api_error',
@@ -109,6 +115,30 @@ class Tersuite_AI_API_Client {
 
         if ($decoded === null && $raw_body !== '') {
             return array('raw' => $raw_body);
+        }
+
+        // Some Django/DRF deployments return HTTP 201 with an empty body and
+        // a Location header pointing at the newly-created resource. Follow it
+        // server-side so the WordPress UI receives the actual resource ID.
+        if ($decoded === null && $raw_body === '' && strtoupper($method) === 'POST') {
+            $location = wp_remote_retrieve_header($response, 'location');
+            if (!empty($location)) {
+                $location_path = (string) wp_parse_url($location, PHP_URL_PATH);
+                $base_path     = (string) wp_parse_url($this->base_url(), PHP_URL_PATH);
+                if ($location_path !== '') {
+                    if ($base_path !== '' && strpos($location_path, $base_path) === 0) {
+                        $location_path = substr($location_path, strlen($base_path));
+                    }
+                    $location_path = ltrim($location_path, '/');
+                    // Only follow API resource URLs; never arbitrary external URLs.
+                    if (strpos($location_path, 'api/v1/') === 0) {
+                        $followed = $this->get($location_path);
+                        if (!is_wp_error($followed) && is_array($followed)) {
+                            return $followed;
+                        }
+                    }
+                }
+            }
         }
 
         return is_array($decoded) ? $decoded : array();
