@@ -72,12 +72,13 @@ class TERSOSTUDIO_Admin_Controller {
         }
 
         $project_id = isset( $_GET['project_id'] ) ? sanitize_text_field( $_GET['project_id'] ) : '';
+        $cache_buster = TERSOSTUDIO_VERSION . '.' . time();
 
         wp_enqueue_media();
         wp_enqueue_script( 'wp-element' );
         wp_enqueue_code_editor( array( 'type' => 'text/x-php' ) );
         wp_enqueue_style( 'wp-codemirror' );
-        wp_enqueue_script( 'tersostudio-workbench-js', TERSOSTUDIO_URL . 'admin/build/index.js', [ 'wp-element', 'jquery' ], TERSOSTUDIO_VERSION, true );
+        wp_enqueue_script( 'tersostudio-workbench-js', TERSOSTUDIO_URL . 'admin/build/index.js', [ 'wp-element', 'jquery' ], $cache_buster, true );
 
         wp_localize_script( 'tersostudio-workbench-js', 'TERSOSTUDIO_State', [
             'rest_url'    => esc_url_raw( rest_url( 'tersostudio/v2' ) ),
