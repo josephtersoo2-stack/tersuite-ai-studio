@@ -1,49 +1,6 @@
-/**
- * Tersuite AI Studio — Notifications View Script
- */
-jQuery(function($) {
-    'use strict';
-
-    function loadNotifications() {
-        var $container = $('#tsa-notifications-list');
-        if (!$container.length) return;
-
-        $container.html('<div style="padding:20px; color:#94a3b8; text-align:center;">Loading notifications...</div>');
-
-        TSAAPI.notifications().done(function(res) {
-            if (res && res.success && res.data) {
-                renderNotifications(res.data);
-            } else {
-                $container.html('<div style="padding:20px; color:#64748b; text-align:center;">No new notifications.</div>');
-            }
-        }).fail(function() {
-            $container.html('<div style="padding:20px; color:#f87171; text-align:center;">Failed to fetch notifications from backend.</div>');
-        });
-    }
-
-    function renderNotifications(items) {
-        var $container = $('#tsa-notifications-list');
-        var list = Array.isArray(items) ? items : (items.results || []);
-
-        if (list.length === 0) {
-            $container.html('<div style="padding:20px; color:#94a3b8; text-align:center;">No notifications at this time.</div>');
-            return;
-        }
-
-        var html = '';
-        for (var i = 0; i < list.length; i++) {
-            var item = list[i];
-            html += '<div class="tsa-card ' + (item.unread ? 'unread' : '') + '">' +
-                '<div style="display:flex; justify-content:space-between; align-items:center;">' +
-                '<strong>' + $('<div/>').text(item.title || 'Notification').html() + '</strong>' +
-                '<small style="color:#64748b;">' + $('<div/>').text(item.created_at || 'Recent').html() + '</small>' +
-                '</div>' +
-                '<p style="font-size:13px; color:#cbd5e1; margin:6px 0;">' + $('<div/>').text(item.message || '').html() + '</p>' +
-                '</div>';
-        }
-
-        $container.html(html);
-    }
-
-    loadNotifications();
+jQuery(function($){'use strict';
+ function normalize(r){var d=TSA.unwrap(r);var a=Array.isArray(d)?d:(d&&d.results)||[];return {items:a,unread:d&&d.unread_count!=null?Number(d.unread_count):a.filter(function(n){return !(n.read||n.is_read);}).length};}
+ function load(){var $l=$('#tsa-notifications-list');TSA.loading($l,'Loading notifications…');TSAAPI.notifications().done(function(r){var n=normalize(r),a=n.items;$('#tsa-header-notification-count,#tsa-sidebar-notification-count').text(n.unread);if(!a.length){TSA.empty($l,'You are all caught up.');return;}$l.html(a.map(function(x){var id=x.id||x.notification_id;var read=!!(x.read||x.is_read);return '<div class="tsa-notice-row '+(read?'is-read':'')+'"><span class="tsa-badge large">'+TSA.esc(x.type==='warning'?'!':'•')+'</span><div><strong>'+TSA.esc(x.title||x.message||'Notification')+'</strong><p>'+TSA.esc(x.description||x.body||'')+'</p><small>'+TSA.esc(x.created_at||x.timestamp||'')+'</small></div>'+(read?'':'<button class="tsa-secondary tsa-mark-read" data-id="'+TSA.esc(id)+'" type="button">Mark read</button>')+'</div>';}).join(''));}).fail(function(x){$('#tsa-header-notification-count,#tsa-sidebar-notification-count').text('0');$l.html('<div class="tsa-error-state">'+TSA.esc(TSA.error(x,'Failed to load notifications.'))+'<br><button class="tsa-secondary tsa-retry-notifications" type="button">Retry</button></div>');});}
+ $(document).on('click','.tsa-mark-read',function(){var $b=$(this),id=$b.data('id');if(!id){TSA.toast('Notification ID is missing.','error');return;}$b.prop('disabled',true).text('Saving…');TSAAPI.markNotificationRead(id).done(function(){TSA.toast('Notification marked as read.','success');load();}).fail(function(x){TSA.toast(TSA.error(x,'Unable to mark notification read.'),'error');$b.prop('disabled',false).text('Mark read');});});
+ $('#tsa-refresh-notifications').on('click',load);$(document).on('click','.tsa-retry-notifications',load);load();
 });

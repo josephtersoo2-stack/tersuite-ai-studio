@@ -8,6 +8,7 @@
         projectId: null,
         currentPath: '',
         originalContent: '',
+        currentRevision: '',
         isDirty: false,
 
         init: function(projectId) {
@@ -23,6 +24,8 @@
                 self.isDirty = (newContent !== self.originalContent);
                 self.updateSaveIndicator();
             });
+
+            $(document).off('keydown.tsaEditor').on('keydown.tsaEditor', function(e){ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){ e.preventDefault(); self.saveCurrentFile(); } });
 
             $(document).off('click', '.tsa-btn-save-file').on('click', '.tsa-btn-save-file', function(e) {
                 e.preventDefault();
@@ -49,6 +52,7 @@
                     if (res && res.success && res.data) {
                         var content = typeof res.data === 'string' ? res.data : (res.data.content || JSON.stringify(res.data, null, 2));
                         self.originalContent = content;
+                        self.currentRevision = (typeof res.data === 'object' && res.data.revision_id) ? res.data.revision_id : (typeof res.data === 'object' && res.data.revision ? res.data.revision : '');
                         self.isDirty = false;
                         self.renderCode(path, content);
                     } else {
@@ -69,10 +73,11 @@
 
             if (window.TSA) window.TSA.toast('Saving file...', 'info');
 
-            TSAAPI.saveFile(self.projectId, self.currentPath, content)
+            TSAAPI.saveFile(self.projectId, self.currentPath, content, self.currentRevision)
                 .done(function(res) {
                     if (res && res.success) {
                         self.originalContent = content;
+                        self.currentRevision = (typeof res.data === 'object' && res.data.revision_id) ? res.data.revision_id : (typeof res.data === 'object' && res.data.revision ? res.data.revision : '');
                         self.isDirty = false;
                         self.updateSaveIndicator();
                         if (window.TSA) window.TSA.toast('File saved successfully!', 'success');

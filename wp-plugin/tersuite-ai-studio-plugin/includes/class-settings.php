@@ -36,7 +36,7 @@ class Tersuite_AI_Settings {
         $out['auto_refresh']=!empty($input['auto_refresh'])?'1':'0';
         $out['notify_generation_complete']=!empty($input['notify_generation_complete'])?'1':'0';
         $out['editor_font_size']=isset($input['editor_font_size'])?max(10,min(20,absint($input['editor_font_size']))):13;
-        $out['theme']='dark'; return $out;
+        $out['theme']=isset($input['theme']) && in_array($input['theme'], array('dark','light'), true) ? $input['theme'] : self::get('theme','dark'); return $out;
     }
     public static function render_field($args){
         $key=$args['key']; $type=$args['type']; $value=self::get($key); $type=$type==='url'?'url':'text';

@@ -1,51 +1,5 @@
-/**
- * Tersuite AI Studio — Versions Management Script
- */
-jQuery(function($) {
-    'use strict';
-
-    var projectId = (window.TersuiteAI && window.TersuiteAI.projectId) ? window.TersuiteAI.projectId : null;
-
-    function loadVersions() {
-        var $list = $('#tsa-versions-list');
-        if (!$list.length || !projectId) return;
-
-        $list.html('<div style="padding:20px; color:#94a3b8; text-align:center;">Loading project versions...</div>');
-
-        TSA.ajax('versions', { id: projectId }).done(function(res) {
-            if (res && res.success && res.data) {
-                renderVersions(res.data);
-            } else {
-                $list.html('<div style="padding:20px; color:#64748b; text-align:center;">No versions recorded for this project yet.</div>');
-            }
-        }).fail(function() {
-            $list.html('<div style="padding:20px; color:#f87171; text-align:center;">Failed to load version history.</div>');
-        });
-    }
-
-    function renderVersions(items) {
-        var $list = $('#tsa-versions-list');
-        var listArr = Array.isArray(items) ? items : (items.results || []);
-
-        if (listArr.length === 0) {
-            $list.html('<div style="padding:20px; color:#94a3b8; text-align:center;">No previous versions created yet.</div>');
-            return;
-        }
-
-        var html = '';
-        for (var i = 0; i < listArr.length; i++) {
-            var v = listArr[i];
-            html += '<div class="tsa-card">' +
-                '<div style="display:flex; justify-content:space-between; align-items:center;">' +
-                '<h4>Version ' + $('<div/>').text(v.version || ('v' + (i + 1))).html() + '</h4>' +
-                '<small style="color:#94a3b8;">' + $('<div/>').text(v.created_at || 'Recent').html() + '</small>' +
-                '</div>' +
-                '<p style="font-size:12px; color:#94a3b8; margin:6px 0;">' + $('<div/>').text(v.summary || 'Version snapshot created after production session.').html() + '</p>' +
-                '</div>';
-        }
-
-        $list.html(html);
-    }
-
-    loadVersions();
-});
+jQuery(function($){'use strict';var pid=TersuiteAI.projectId,versions=[];
+ function load(){var $l=$('#tsa-versions-list');if(!pid){TSA.empty($l,'Open a project in AI Studio to inspect versions.');return;}TSA.loading($l,'Loading versions…');TSAAPI.versions(pid).done(function(r){var d=TSA.unwrap(r),a=Array.isArray(d)?d:(d&&d.results)||[];versions=a;if(!a.length){TSA.empty($l,'No versions have been recorded yet.');return;}$l.html(a.map(function(v,i){var id=v.id||v.version_id;return '<div class="tsa-version"><div class="tsa-version-mark">'+TSA.esc(v.version||('v'+(i+1)))+'</div><div><strong>'+TSA.esc(v.current?'Current':(v.status||'Snapshot'))+'</strong><p>'+TSA.esc(v.summary||((v.file_count||'—')+' files'))+'</p><small>'+TSA.esc(v.created_at||'')+'</small></div><div class="tsa-version-actions"><button class="tsa-secondary tsa-version-view" data-id="'+TSA.esc(id)+'" type="button">View Changes</button><button class="tsa-ghost tsa-version-restore" data-id="'+TSA.esc(id)+'" type="button" '+(v.current?'disabled':'')+'>Restore</button></div></div>';}).join(''));}).fail(function(x){$l.html('<div class="tsa-error-state">'+TSA.esc(TSA.error(x,'Failed to load versions.'))+'<br><button class="tsa-secondary tsa-retry-versions" type="button">Retry</button></div>');});}
+ function showChanges(v){var files=v.changed_files||v.files_changed||v.files||[];if(typeof files==='string')files=[files];var list=Array.isArray(files)&&files.length?'<ul class="tsa-plan-task-list">'+files.map(function(f){return '<li>'+TSA.esc(typeof f==='string'?f:(f.path||f.name||'Changed file'))+(f&&typeof f==='object'&&f.change?' <span>'+TSA.esc(f.change)+'</span>':'')+'</li>';}).join('')+'</ul>':'<p>No individual changed-file list was returned for this snapshot.</p>';var html='<div class="tsa-modal-overlay is-open" style="display:flex" id="tsa-version-detail-modal"><div class="tsa-modal-card tsa-form-modal"><button class="tsa-modal-close" id="tsa-version-detail-close" type="button">×</button><span class="tsa-kicker">VERSION '+TSA.esc(v.version||v.id||'')+'</span><h2>'+TSA.esc(v.current?'Current version':(v.status||'Snapshot'))+'</h2><p>'+TSA.esc(v.summary||'No summary supplied.')+'</p><p><strong>Created:</strong> '+TSA.esc(v.created_at||'—')+'</p><p><strong>Files:</strong> '+TSA.esc(v.file_count!=null?v.file_count:(Array.isArray(files)?files.length:'—'))+'</p><h3>Changed files</h3>'+list+'</div></div>';$('body').append(html);}
+ $(document).on('click','.tsa-version-view',function(){var id=$(this).data('id'),v=versions.find(function(x){return String(x.id||x.version_id)===String(id);});if(v)showChanges(v);});$(document).on('click','#tsa-version-detail-close,#tsa-version-detail-modal',function(e){if(e.target.id==='tsa-version-detail-modal'||e.target.id==='tsa-version-detail-close')$('#tsa-version-detail-modal').remove();});
+ $(document).on('click','.tsa-version-restore',function(){var id=$(this).data('id');if($(this).prop('disabled'))return;if(!confirm('Restore this version? This changes the authoritative project workspace.'))return;var $b=$(this).prop('disabled',true).text('Restoring…');TSAAPI.restoreVersion(pid,id).done(function(){TSA.toast('Version restored.','success');load();}).fail(function(x){TSA.toast(TSA.error(x,'Restore failed.'),'error');}).always(function(){$b.prop('disabled',false).text('Restore');});});$('#tsa-refresh-versions').on('click',load);$(document).on('click','.tsa-retry-versions',load);load();});

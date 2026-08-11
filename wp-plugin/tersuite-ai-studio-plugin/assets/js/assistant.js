@@ -1,133 +1,26 @@
-/**
- * Tersuite AI Studio — Coordinator Assistant Component
- *
- * Responsibilities:
- * - Handle conversation with the single user-facing identity: Tersuite Coordinator.
- * - Enforce Coordinator-only interaction (NO specialist-agent selector).
- * - Attach UI context payload (screen, selected file, version, session) to every request.
- * - Render formatted Coordinator messages, action triggers, and plan approval prompts.
- */
-(function($) {
-    'use strict';
-
-    window.TSAAssistant = {
-        projectId: null,
-        selectedFile: '',
-        selectedVersion: '',
-        activeSession: '',
-
-        init: function(projectId) {
-            this.projectId = projectId || window.TersuiteAI ? window.TersuiteAI.projectId : null;
-            this.bindEvents();
-        },
-
-        bindEvents: function() {
-            var self = this;
-
-            $('#tsa-send-chat').off('click').on('click', function(e) {
-                e.preventDefault();
-                self.sendMessage();
-            });
-
-            $('#tsa-chat-input').off('keydown').on('keydown', function(e) {
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                    e.preventDefault();
-                    self.sendMessage();
-                }
-            });
-        },
-
-        setContext: function(file, version, session) {
-            if (file !== undefined) this.selectedFile = file;
-            if (version !== undefined) this.selectedVersion = version;
-            if (session !== undefined) this.activeSession = session;
-        },
-
-        getUiContext: function() {
-            return {
-                project_id: this.projectId,
-                screen: 'ai_studio',
-                selected_file: this.selectedFile,
-                selected_version: this.selectedVersion,
-                active_session: this.activeSession,
-                route: window.TersuiteAI ? window.TersuiteAI.page : 'tersuite-ai-studio'
-            };
-        },
-
-        sendMessage: function() {
-            var self = this;
-            var $input = $('#tsa-chat-input');
-            var text = $input.val().trim();
-
-            if (!text) return;
-            if (!self.projectId) {
-                if (window.TSA) window.TSA.toast('Please select or open a project first.', 'info');
-                return;
-            }
-
-            var safeText = $('<div/>').text(text).html();
-            var timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-            // Append User Message
-            var userHtml = '<div class="chat-user"><strong>You</strong><small>' + timeStr + '</small><p>' + safeText + '</p></div>';
-            $('#tsa-chat').append(userHtml);
-            $input.val('');
-            self.scrollToBottom();
-
-            // Append Typing Indicator
-            var $typing = $('<div class="chat-agent coordinator typing-indicator"><div class="agent-head"><span class="agent-avatar">✦</span><strong>Tersuite Coordinator</strong><span class="tsa-status-chip">Thinking...</span></div><p><i>Analyzing project context & production plan...</i></p></div>');
-            $('#tsa-chat').append($typing);
-            self.scrollToBottom();
-
-            // Send to Coordinator API via API Client
-            TSAAPI.coordinatorMessage(self.projectId, text, self.getUiContext())
-                .done(function(res) {
-                    $typing.remove();
-                    if (res && res.success && res.data) {
-                        self.renderResponse(res.data);
-                    } else {
-                        var errMsg = (res && res.data && res.data.message) ? res.data.message : 'Coordinator could not process your message.';
-                        self.renderError(errMsg);
-                    }
-                })
-                .fail(function(xhr) {
-                    $typing.remove();
-                    self.renderError('Connection to Coordinator backend failed.');
-                });
-        },
-
-        renderResponse: function(data) {
-            var text = data.message || data.text || 'Coordinator received your message.';
-            var safeText = $('<div/>').text(text).html();
-            var timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-            var actionsHtml = '';
-            if (data.plan_ready || data.plan_id) {
-                var planId = data.plan_id || 'latest';
-                actionsHtml = '<div class="coordinator-actions" style="margin-top:10px;">' +
-                    '<button class="tsa-secondary tsa-btn-view-plan" data-plan-id="' + planId + '">View Production Plan</button>' +
-                    '<button class="tsa-primary tsa-btn-approve-plan" data-plan-id="' + planId + '">Approve Production ⚡</button>' +
-                    '</div>';
-            }
-
-            var agentHtml = '<div class="chat-agent coordinator"><div class="agent-head"><span class="agent-avatar">✦</span><strong>Tersuite Coordinator</strong><span class="tsa-status-chip live">' + timeStr + '</span></div><p>' + safeText + '</p>' + actionsHtml + '</div>';
-
-            $('#tsa-chat').append(agentHtml);
-            this.scrollToBottom();
-        },
-
-        renderError: function(errMsg) {
-            var agentHtml = '<div class="chat-agent coordinator error-msg"><div class="agent-head"><span class="agent-avatar">✦</span><strong>Tersuite Coordinator</strong><span class="tsa-status-chip error">Error</span></div><p style="color:#f87171;">' + $('<div/>').text(errMsg).html() + '</p></div>';
-            $('#tsa-chat').append(agentHtml);
-            this.scrollToBottom();
-        },
-
-        scrollToBottom: function() {
-            var $chat = $('#tsa-chat');
-            if ($chat.length) {
-                $chat.scrollTop($chat[0].scrollHeight);
-            }
-        }
-    };
-
+(function($){'use strict';
+window.TSAAssistant={projectId:null,selectedFile:'',selectedVersion:'',activeSession:'',attachments:[],
+init:function(id){this.projectId=id||(window.TersuiteAI&&window.TersuiteAI.projectId)||null;this.bindEvents();},
+bindEvents:function(){var self=this;
+ $('#tsa-send-chat').off('.tsaAssistant').on('click.tsaAssistant',function(e){e.preventDefault();e.stopPropagation();self.sendMessage();});
+ $('#tsa-chat-input').off('.tsaAssistant').on('keydown.tsaAssistant',function(e){if(e.key==='Enter'&&!e.shiftKey&&(e.ctrlKey||e.metaKey)){e.preventDefault();self.sendMessage();}});
+ $('#tsa-attach-chat').off('.tsaAssistant').on('click.tsaAssistant',function(){if(!self.projectId){TSA.toast('Open a project before attaching files.','error');return;}$('#tsa-chat-attachment').trigger('click');});
+ $('#tsa-chat-attachment').off('.tsaAssistant').on('change.tsaAssistant',function(){var files=Array.prototype.slice.call(this.files||[]);if(!files.length)return;self.uploadAttachments(files);this.value='';});
+ $('#tsa-clear-chat-attachments').off('.tsaAssistant').on('click.tsaAssistant',function(){self.attachments=[];self.renderAttachments();});
+},
+setContext:function(file,version,session){if(file!==undefined)this.selectedFile=file;if(version!==undefined)this.selectedVersion=version;if(session!==undefined)this.activeSession=session;},
+getUiContext:function(){return{project_id:this.projectId,screen:'ai_studio',selected_file:this.selectedFile,selected_version:this.selectedVersion,active_session:this.activeSession,route:window.TersuiteAI?window.TersuiteAI.page:'tersuite-ai-ai-studio'};},
+uploadAttachments:function(files){var self=this;var remaining=files.length;files.forEach(function(file){var $status=$('<div class="tsa-attachment-uploading">Uploading '+TSA.esc(file.name)+'…</div>');$('#tsa-chat-attachments').append($status);TSAAPI.uploadChatAttachment(file).done(function(r){var d=TSA.unwrap(r);if(d){self.attachments.push(d);$status.remove();self.renderAttachments();}else{$status.text('Unable to attach '+file.name);}}).fail(function(x){$status.text(TSA.error(x,'Unable to upload '+file.name));setTimeout(function(){$status.fadeOut(200,function(){$(this).remove();});},3000);}).always(function(){remaining--;});});},
+renderAttachments:function(){var self=this,$box=$('#tsa-chat-attachments');if(!$box.length)return;if(!self.attachments.length){$box.empty().hide();return;}var html=self.attachments.map(function(a,i){var image=String(a.mime||'').indexOf('image/')===0?'<img src="'+TSA.esc(a.url)+'" alt="">':'';return '<div class="tsa-attachment-chip">'+image+'<span title="'+TSA.esc(a.name)+'">'+TSA.esc(a.name)+'</span><button type="button" data-index="'+i+'" aria-label="Remove '+TSA.esc(a.name)+'">×</button></div>';}).join('');$box.html(html).show();$box.find('button').off('click').on('click',function(){self.attachments.splice(Number($(this).data('index')),1);self.renderAttachments();});},
+sendMessage:function(){var self=this,$input=$('#tsa-chat-input'),text=$input.val().trim();if(!text&&!self.attachments.length)return;if(!self.projectId){TSA.toast('Open a project before chatting with the Coordinator.','error');return;}
+ var $send=$('#tsa-send-chat');if($send.prop('disabled'))return;$send.prop('disabled',true).text('Thinking…');
+ var attachmentSummary=self.attachments.length?'\n\nAttachments:\n'+self.attachments.map(function(a){return '- '+a.name+' ('+a.mime+')';}).join('\n'):'';
+ $('#tsa-chat').append('<div class="chat-user"><strong>You</strong><small>'+new Date().toLocaleTimeString()+'</small><p>'+TSA.esc(text||'Please review the attached files.')+'</p>'+self.renderAttachmentPreview(self.attachments)+'</div>');
+ $input.val('');var sentAttachments=self.attachments.slice();self.attachments=[];self.renderAttachments();
+ var $typing=$('<div class="chat-agent coordinator typing-indicator"><div class="agent-head"><span class="agent-avatar">✦</span><strong>Tersuite Coordinator</strong></div><p><i>Analyzing the project context…</i></p></div>');$('#tsa-chat').append($typing);self.scrollToBottom();
+ TSAAPI.coordinatorMessage(self.projectId,(text||'Please review the attached files.')+attachmentSummary,self.getUiContext(),sentAttachments).done(function(r){$typing.remove();var d=TSA.unwrap(r);if(d)self.renderResponse(d);else self.renderError('Coordinator returned an empty response.');}).fail(function(x){$typing.remove();self.renderError(TSA.error(x,'Coordinator connection failed.'));}).always(function(){$send.prop('disabled',false).text('➤ Send');});},
+renderAttachmentPreview:function(list){if(!list||!list.length)return '';return '<div class="tsa-chat-attachment-preview">'+list.map(function(a){return '<span>📎 '+TSA.esc(a.name)+'</span>';}).join('')+'</div>';},
+renderResponse:function(d){var text=d.message||d.text||'Coordinator received your message.';var planId=d.plan_id||d.production_plan_id||null;if(planId)window.TSAStudio&&TSAStudio.setPlan(planId);var actions=planId?'<div class="coordinator-actions"><button class="tsa-secondary tsa-btn-view-plan" data-plan-id="'+TSA.esc(planId)+'" type="button">View Production Plan</button><button class="tsa-primary tsa-btn-approve-plan" data-plan-id="'+TSA.esc(planId)+'" type="button">Approve Production</button></div>':'';$('#tsa-chat').append('<div class="chat-agent coordinator"><div class="agent-head"><span class="agent-avatar">✦</span><strong>Tersuite Coordinator</strong><span class="tsa-status-chip live">Now</span></div><p>'+TSA.esc(text)+'</p>'+actions+'</div>');this.scrollToBottom();},
+renderError:function(msg){$('#tsa-chat').append('<div class="chat-agent coordinator error-msg"><div class="agent-head"><span class="agent-avatar">✦</span><strong>Tersuite Coordinator</strong><span class="tsa-status-chip error">Error</span></div><p>'+TSA.esc(msg)+'</p></div>');this.scrollToBottom();},
+scrollToBottom:function(){var c=$('#tsa-chat')[0];if(c)c.scrollTop=c.scrollHeight;}};
 })(jQuery);

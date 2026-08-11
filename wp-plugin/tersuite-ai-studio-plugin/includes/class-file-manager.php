@@ -41,14 +41,15 @@ class Tersuite_AI_File_Manager {
     /**
      * Save updated file contents back to Django workspace.
      */
-    public function save($project_id, $path, $content) {
+    public function save($project_id, $path, $content, $revision = '') {
         if (empty($project_id) || empty($path)) {
             return new WP_Error('invalid_params', __('Project ID and file path are required to save file.', 'tersuite-ai-studio'));
         }
 
         $payload = array(
             'file_path' => sanitize_text_field($path),
-            'content'   => $content,
+            'content' => $content,
+            'revision_id' => sanitize_text_field($revision),
         );
 
         return $this->api->post($this->project_base($project_id), $payload);

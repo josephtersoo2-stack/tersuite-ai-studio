@@ -3,7 +3,7 @@
  * Plugin Name: Tersuite AI Studio
  * Plugin URI: https://tersuite.com/
  * Description: AI-powered WordPress plugin development studio connected to the Tersuite Django backend.
- * Version: 0.3.0
+ * Version: 0.3.3
  * Author: Tersuite
  * License: GPL-2.0-or-later
  * Text Domain: tersuite-ai-studio
@@ -11,7 +11,7 @@
 
 defined('ABSPATH') || exit;
 
-define('TERSUITE_AI_VERSION', '0.3.0');
+define('TERSUITE_AI_VERSION', '0.3.3');
 define('TERSUITE_AI_FILE', __FILE__);
 define('TERSUITE_AI_DIR', plugin_dir_path(__FILE__));
 define('TERSUITE_AI_URL', plugin_dir_url(__FILE__));
@@ -42,7 +42,6 @@ require_once TERSUITE_AI_DIR . 'includes/class-subscription-manager.php';
 require_once TERSUITE_AI_DIR . 'includes/class-activity-manager.php';
 require_once TERSUITE_AI_DIR . 'includes/class-notification-manager.php';
 require_once TERSUITE_AI_DIR . 'includes/class-websocket-client.php';
-require_once TERSUITE_AI_DIR . 'includes/class-dashboard-manager.php';
 require_once TERSUITE_AI_DIR . 'includes/class-asset-manager.php';
 require_once TERSUITE_AI_DIR . 'includes/class-ajax.php';
 require_once TERSUITE_AI_DIR . 'includes/class-admin-menu.php';

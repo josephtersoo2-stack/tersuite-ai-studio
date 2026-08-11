@@ -1,26 +1,8 @@
-/**
- * Tersuite AI Studio — Subscription & Billing Script
- */
-jQuery(function($) {
-    'use strict';
-
-    function loadSubscription() {
-        var $subWrap = $('#tsa-subscription-wrap');
-        if (!$subWrap.length) return;
-
-        TSAAPI.subscription().done(function(res) {
-            if (res && res.success && res.data) {
-                renderSubscription(res.data);
-            }
-        });
-    }
-
-    function renderSubscription(data) {
-        if (!data) return;
-        var status = data.status || {};
-        if (status.plan_name) $('#tsa-current-plan-name').text(status.plan_name);
-        if (status.status) $('#tsa-current-plan-status').text(status.status);
-    }
-
-    loadSubscription();
+jQuery(function($){'use strict';var pendingPlan='',pendingButton=null;
+ function load(){TSAAPI.subscription().done(function(r){var d=TSA.unwrap(r)||{},s=d.status||{},plans=Array.isArray(d.plans)?d.plans:(d.plans&&d.plans.results)||[];$('#tsa-subscription-status').html('<span class="tsa-kicker">CURRENT ACCOUNT</span><h2>'+TSA.esc((s.plan&&s.plan.name)||s.plan_name||'No active plan')+'</h2><p>Status: '+TSA.esc(s.status||'Unknown')+' · Credits: '+TSA.esc(s.credits_remaining!=null?s.credits_remaining:'—')+'</p>');if(!plans.length){TSA.empty($('#tsa-plan-grid'),'No subscription plans were returned.');return;}$('#tsa-plan-grid').html(plans.map(function(p){var id=p.id||p.slug||p.name;var current=String(id)==String(s.plan_id||s.plan&&s.plan.id);return '<div class="tsa-plan-product '+(current?'featured':'')+'"><span>'+TSA.esc(p.name||'Plan')+'</span><h2>'+TSA.esc(p.price!=null?p.price:'—')+'<small>'+TSA.esc(p.interval?'/'+p.interval:'')+'</small></h2><p>'+TSA.esc(p.description||'')+'</p><button class="'+(current?'tsa-secondary':'tsa-primary')+' tsa-subscribe" data-plan="'+TSA.esc(id)+'" data-plan-name="'+TSA.esc(p.name||'Plan')+'" '+(current?'disabled':'')+'>'+ (current?'Current Plan':'Choose Plan') +'</button></div>';}).join(''));}).fail(function(x){$('#tsa-subscription-status').html('<div class="tsa-error-state">'+TSA.esc(TSA.error(x,'Unable to load subscription.'))+'<br><button class="tsa-secondary tsa-retry-subscription" type="button">Retry</button></div>');});}
+ function close(){pendingPlan='';pendingButton=null;$('#tsa-subscribe-modal').prop('hidden',true).removeClass('is-open').hide();}
+ $(document).on('click','.tsa-subscribe',function(){pendingPlan=$(this).data('plan');pendingButton=$(this);$('#tsa-subscribe-plan-name').text('You selected '+($(this).data('plan-name')||'this plan')+'. Choose a payment gateway to continue.');$('#tsa-subscribe-modal').prop('hidden',false).addClass('is-open').css('display','flex');});
+ $('#tsa-subscribe-modal-close,#tsa-subscribe-cancel').on('click',close);
+ $('#tsa-subscribe-confirm').on('click',function(){if(!pendingPlan)return;var gateway=$('#tsa-subscribe-gateway').val();var $b=$(this).prop('disabled',true).text('Submitting…');if(pendingButton)pendingButton.prop('disabled',true).text('Submitting…');TSAAPI.subscribe(pendingPlan,gateway).done(function(r){var d=TSA.unwrap(r)||{};if(d.redirect_url){window.location.href=d.redirect_url;return;}TSA.toast(d.message||'Subscription request submitted.','success');close();setTimeout(load,500);}).fail(function(x){TSA.toast(TSA.error(x,'Subscription request failed.'),'error');}).always(function(){$b.prop('disabled',false).text('Continue to payment');if(pendingButton)pendingButton.prop('disabled',false).text('Choose Plan');});});
+ $(document).on('click','.tsa-retry-subscription',load);load();
 });

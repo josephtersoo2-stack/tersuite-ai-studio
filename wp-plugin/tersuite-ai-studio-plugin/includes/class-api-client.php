@@ -95,11 +95,8 @@ class Tersuite_AI_API_Client {
         if ($status_code < 200 || $status_code >= 300) {
             $error_msg = sprintf(__('Backend returned HTTP status code %d.', 'tersuite-ai-studio'), $status_code);
             if (is_array($decoded)) {
-                foreach (array('message', 'detail', 'error', 'error_description') as $key) {
-                    if (isset($decoded[$key]) && is_scalar($decoded[$key]) && (string) $decoded[$key] !== '') {
-                        $error_msg = (string) $decoded[$key];
-                        break;
-                    }
+                foreach (array('message','detail','error','error_description') as $key) {
+                    if (isset($decoded[$key]) && is_scalar($decoded[$key]) && (string)$decoded[$key] !== '') { $error_msg = (string)$decoded[$key]; break; }
                 }
             }
 
@@ -124,7 +121,7 @@ class Tersuite_AI_API_Client {
             $location = wp_remote_retrieve_header($response, 'location');
             if (!empty($location)) {
                 $location_path = (string) wp_parse_url($location, PHP_URL_PATH);
-                $base_path     = (string) wp_parse_url($this->base_url(), PHP_URL_PATH);
+                $base_path = (string) wp_parse_url($this->base_url(), PHP_URL_PATH);
                 if ($location_path !== '') {
                     if ($base_path !== '' && strpos($location_path, $base_path) === 0) {
                         $location_path = substr($location_path, strlen($base_path));

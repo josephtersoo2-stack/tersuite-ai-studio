@@ -41,7 +41,7 @@ class Tersuite_AI_Coordinator_Manager {
      * @param array      $ui_context
      * @return array|WP_Error
      */
-    public function send_message($project_id, $message, $ui_context = array()) {
+    public function send_message($project_id, $message, $ui_context = array(), $attachments = array()) {
         if (empty($project_id)) {
             return new WP_Error('missing_project_id', __('Project ID is required to send messages.', 'tersuite-ai-studio'));
         }
@@ -55,6 +55,16 @@ class Tersuite_AI_Coordinator_Manager {
             'message'    => $clean_message,
             'ui_context' => !empty($ui_context) ? $ui_context : $this->context_manager->ui_payload($project_id),
         );
+        if (!empty($attachments) && is_array($attachments)) {
+            $payload['attachments'] = array_values(array_map(function($item){
+                return array(
+                    'name' => sanitize_file_name($item['name'] ?? ''),
+                    'url' => esc_url_raw($item['url'] ?? ''),
+                    'mime' => sanitize_text_field($item['mime'] ?? ''),
+                    'size' => absint($item['size'] ?? 0),
+                );
+            }, $attachments));
+        }
 
         $path = 'api/v1/projects/' . rawurlencode((string) $project_id) . '/coordinator/messages';
         return $this->api->post($path, $payload);

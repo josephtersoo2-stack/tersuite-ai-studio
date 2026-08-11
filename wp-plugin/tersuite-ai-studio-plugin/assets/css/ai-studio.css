@@ -1,1 +1,5 @@
 /* Included in admin.css; reserved for future editor-specific enhancements. */
+[data-tsa-theme="light"] .tsa-studio-grid>.tsa-panel{background:#fff;border-color:#dbe2ea}
+[data-tsa-theme="light"] .tsa-code-wrap{background:#fbfcfe;color:#172033}
+[data-tsa-theme="light"] .tsa-editor-tabs{background:#f8fafc;border-color:#dbe2ea}
+[data-tsa-theme="light"] .tsa-editor-tabs button{color:#475569}
