@@ -106,6 +106,11 @@ class Module02UsersTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["results"][0]["username"], "usera")
 
+    def test_invalid_ordering_fallback(self):
+        response = self.staff_client.get("/api/v1/users/?ordering=malicious_field;DROP_TABLE")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("results", response.data)
+
     # 4. User Profile & Patch Update
     def test_user_profile_me(self):
         response = self.client.get("/api/v1/users/me/")
@@ -116,6 +121,13 @@ class Module02UsersTestCase(TestCase):
         response = self.client.patch("/api/v1/users/me/", {"first_name": "AliceUpdated"}, format="json")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["first_name"], "AliceUpdated")
+
+    def test_privilege_escalation_prevented(self):
+        response = self.client.patch("/api/v1/users/me/", {"is_staff": True, "is_superuser": True}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.user_a.refresh_from_db()
+        self.assertFalse(self.user_a.is_staff)
+        self.assertFalse(self.user_a.is_superuser)
 
     # 5. User Activation & Deactivation
     def test_staff_activate_deactivate_user(self):
