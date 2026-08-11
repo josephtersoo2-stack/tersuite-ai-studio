@@ -108,7 +108,7 @@ class TERSOSTUDIO_REST_Chat_Controller extends WP_REST_Controller {
         $config = $this->get_backend_config();
         $project_id = sanitize_text_field( $request->get_param( 'project_id' ) );
 
-        $response = wp_remote_get( $config['url'] . 'projects/' . $project_id . '/deliver/', [
+        $response = wp_remote_get( $config['url'] . 'projects/' . $project_id . '/stream/', [
             'headers' => [ 'Authorization' => 'Token ' . $config['token'] ],
             'timeout' => 15,
         ] );
