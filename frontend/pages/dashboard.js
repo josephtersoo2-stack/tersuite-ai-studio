@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Navbar from '../components/Navbar';
 import {
-  LayoutDashboard, User, Key, Layers, Plus, Bot, ShieldCheck, CheckCircle2,
-  Copy, Check, RefreshCw, Cpu, Sparkles, Lock, Mail, Save, LogOut, Settings, CreditCard
+  LayoutDashboard, User, Key, Layers, Bot, ShieldCheck, CheckCircle2,
+  Copy, Check, RefreshCw, Cpu, Sparkles, Lock, Mail, Save, ExternalLink, Settings, Download
 } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/';
@@ -18,7 +18,6 @@ export default function UserDashboard() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
-  const [creating, setCreating] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
 
   // Profile Edit State
@@ -26,11 +25,6 @@ export default function UserDashboard() {
   const [editEmail, setEditEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
-
-  // Project Form State
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [selectedModel, setSelectedModel] = useState('gemini-3.6-flash');
 
   useEffect(() => {
     const t = localStorage.getItem('tersuite_token');
@@ -66,39 +60,6 @@ export default function UserDashboard() {
     }
   }
 
-  async function handleCreateProject(e) {
-    e.preventDefault();
-    if (!title.trim()) return;
-    setCreating(true);
-    try {
-      const res = await fetch(API_BASE + 'projects/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Token ' + token
-        },
-        body: JSON.stringify({
-          name: title,
-          description: description,
-          metadata: { model: selectedModel }
-        })
-      });
-      if (res.ok) {
-        setTitle('');
-        setDescription('');
-        fetchProjects(token);
-        alert('Project created successfully! Agents dispatched.');
-      } else {
-        const err = await res.json();
-        alert('Failed to create project: ' + JSON.stringify(err));
-      }
-    } catch (err) {
-      alert('Error creating project: ' + err.message);
-    } finally {
-      setCreating(false);
-    }
-  }
-
   function handleSaveProfile(e) {
     e.preventDefault();
     localStorage.setItem('tersuite_username', editUsername);
@@ -119,7 +80,7 @@ export default function UserDashboard() {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center font-sans">
         <div className="text-sm text-slate-400 font-semibold flex items-center gap-2">
-          <Bot className="w-5 h-5 text-indigo-400 animate-spin" /> Verifying user dashboard...
+          <Bot className="w-5 h-5 text-indigo-400 animate-spin" /> Loading user dashboard...
         </div>
       </div>
     );
@@ -128,13 +89,13 @@ export default function UserDashboard() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500 selection:text-white">
       <Head>
-        <title>User Account & Studio Dashboard — Tersuite AI Studio</title>
+        <title>User Dashboard — Tersuite AI Studio</title>
       </Head>
 
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-6 py-10">
-        {/* User Account Banner */}
+        {/* User Account Header */}
         <div className="glass-card rounded-2xl p-6 mb-8 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-0.5 shadow-lg shadow-indigo-500/20">
@@ -149,11 +110,11 @@ export default function UserDashboard() {
                   Pro Studio Account
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-1">{email} • Active Gemini 3.6 Agent Quota</p>
+              <p className="text-xs text-slate-400 mt-1">{email} • Active Gemini 3.6 Agent Backend</p>
             </div>
           </div>
 
-          {/* Tab Navigation */}
+          {/* Navigation Tabs */}
           <div className="flex items-center gap-2 bg-slate-950/80 p-1.5 rounded-xl border border-slate-800/80">
             <button
               onClick={() => setActiveTab('projects')}
@@ -161,7 +122,7 @@ export default function UserDashboard() {
                 activeTab === 'projects' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Layers className="w-4 h-4" /> Plugin Projects
+              <Layers className="w-4 h-4" /> Plugin Generations History
             </button>
             <button
               onClick={() => setActiveTab('account')}
@@ -169,7 +130,7 @@ export default function UserDashboard() {
                 activeTab === 'account' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <User className="w-4 h-4" /> Account Settings
+              <User className="w-4 h-4" /> Account Profile
             </button>
             <button
               onClick={() => setActiveTab('apikeys')}
@@ -182,104 +143,63 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* TAB 1: PLUGIN PROJECTS & AGENT GENERATOR */}
+        {/* TAB 1: READ-ONLY PLUGIN GENERATIONS HISTORY */}
         {activeTab === 'projects' && (
           <div className="grid lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-8">
-              {/* Create Project Form */}
-              <div className="glass-card rounded-2xl p-6 border border-slate-800">
-                <div className="flex items-center gap-2 mb-4">
-                  <Plus className="w-5 h-5 text-indigo-400" />
-                  <h2 className="text-lg font-bold text-white">Create New WordPress Plugin Project</h2>
-                </div>
-
-                <form onSubmit={handleCreateProject} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Plugin Title</label>
-                    <input
-                      type="text"
-                      required
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="e.g. WooCommerce Custom Discount Matrix"
-                      className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 text-white rounded-xl px-4 py-3 text-sm outline-none transition"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Plugin Requirements & Description</label>
-                    <textarea
-                      rows={3}
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Describe what features, WP admin pages, nonces, or REST API endpoints this plugin needs..."
-                      className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 text-white rounded-xl px-4 py-3 text-sm outline-none transition"
-                    />
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-2">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-cyan-400" />
-                      <span className="text-xs font-semibold text-slate-400">AI Model:</span>
-                      <select
-                        value={selectedModel}
-                        onChange={(e) => setSelectedModel(e.target.value)}
-                        className="bg-slate-950 border border-slate-800 text-cyan-400 font-semibold text-xs rounded-lg px-3 py-2 outline-none"
-                      >
-                        <option value="gemini-3.6-flash">Gemini 3.6 Flash (Recommended)</option>
-                        <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
-                        <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview</option>
-                      </select>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={creating}
-                      className="w-full sm:w-auto bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-indigo-500/20 transition flex items-center justify-center gap-2 text-sm glow-btn"
-                    >
-                      {creating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
-                      {creating ? 'Initializing Agents...' : 'Start AI Generation'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              {/* Projects List */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Plugin Generations Card */}
               <div className="glass-card rounded-2xl p-6 border border-slate-800">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    <Layers className="w-5 h-5 text-cyan-400" /> Your Projects ({projects.length})
-                  </h2>
+                  <div>
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Layers className="w-5 h-5 text-cyan-400" /> WordPress Plugins Generated ({projects.length})
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-0.5">History of plugins created via your connected WordPress Admin sites.</p>
+                  </div>
                   <button
                     onClick={() => fetchProjects(token)}
-                    className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 transition"
+                    className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 transition bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg"
                   >
-                    <RefreshCw className="w-3.5 h-3.5" /> Refresh
+                    <RefreshCw className="w-3.5 h-3.5" /> Refresh List
                   </button>
                 </div>
 
                 {loading ? (
-                  <div className="py-12 text-center text-slate-500 text-sm">Loading projects from backend API...</div>
+                  <div className="py-12 text-center text-slate-500 text-sm flex items-center justify-center gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" /> Syncing plugin history from Django backend...
+                  </div>
                 ) : projects.length === 0 ? (
                   <div className="py-12 text-center text-slate-500 border border-dashed border-slate-800 rounded-xl p-8">
                     <Bot className="w-10 h-10 mx-auto text-slate-600 mb-3" />
-                    <p className="text-sm font-semibold text-slate-400 mb-1">No plugin projects created yet.</p>
-                    <p className="text-xs text-slate-500">Fill out the form above to deploy your 7-agent AI team!</p>
+                    <p className="text-sm font-semibold text-slate-300 mb-1">No WordPress Plugins Generated Yet.</p>
+                    <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                      To create a plugin, install the <code className="text-indigo-400">tersostudio.zip</code> plugin in your WordPress Admin, connect your API key, and start a session with the AI Agent Coordinator!
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {projects.map((p, idx) => (
                       <div key={p.id || idx} className="bg-slate-950 border border-slate-800/80 rounded-xl p-5 hover:border-slate-700 transition">
                         <div className="flex items-start justify-between gap-4 mb-2">
-                          <h3 className="font-bold text-white text-base">{p.name || 'Untitled Project'}</h3>
+                          <div>
+                            <h3 className="font-bold text-white text-base">{p.name || 'Untitled Plugin'}</h3>
+                            <span className="text-[11px] text-slate-500 font-mono">UUID: #{p.id}</span>
+                          </div>
                           <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
-                            <CheckCircle2 className="w-3 h-3" /> {p.status || 'Active'}
+                            <CheckCircle2 className="w-3.5 h-3.5" /> {p.status ? p.status.toUpperCase() : 'COMPLETED'}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-400 mb-4 line-clamp-2">{p.description || 'No description provided.'}</p>
-                        <div className="flex items-center justify-between text-xs text-slate-500 pt-3 border-t border-slate-900">
-                          <span>ID: #{p.id || idx + 1}</span>
-                          <span className="text-indigo-400 font-semibold font-mono">Model: {p.metadata?.model || 'gemini-3.6-flash'}</span>
+
+                        <p className="text-xs text-slate-400 mb-4 line-clamp-2 leading-relaxed">{p.description || 'No description recorded.'}</p>
+
+                        <div className="flex items-center justify-between text-xs text-slate-400 pt-3 border-t border-slate-900">
+                          <span className="flex items-center gap-1">
+                            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                            Model: <strong className="text-slate-200">{p.metadata?.model || 'gemini-3.6-flash'}</strong>
+                          </span>
+                          <span className="text-slate-500">
+                            Created: {p.created_at ? new Date(p.created_at).toLocaleDateString() : 'Recent'}
+                          </span>
                         </div>
                       </div>
                     ))}
@@ -288,26 +208,28 @@ export default function UserDashboard() {
               </div>
             </div>
 
-            {/* Sidebar */}
+            {/* Sidebar: How Generation Works */}
             <div className="space-y-6">
               <div className="glass-card rounded-2xl p-6 border border-slate-800">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300 mb-4 flex items-center gap-2">
-                  <Cpu className="w-4 h-4 text-indigo-400" /> Active AI Provider Engine
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300 mb-3 flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-indigo-400" /> How Plugin Creation Works
                 </h3>
-                <div className="space-y-3 font-mono text-xs">
-                  <div className="flex justify-between items-center bg-slate-950 p-3 rounded-xl border border-slate-900">
-                    <span className="text-slate-400">Provider:</span>
-                    <span className="text-emerald-400 font-bold">Google Gemini</span>
-                  </div>
-                  <div className="flex justify-between items-center bg-slate-950 p-3 rounded-xl border border-slate-900">
-                    <span className="text-slate-400">Default Model:</span>
-                    <span className="text-indigo-400 font-bold">gemini-3.6-flash</span>
-                  </div>
-                  <div className="flex justify-between items-center bg-slate-950 p-3 rounded-xl border border-slate-900">
-                    <span className="text-slate-400">Task Workers:</span>
-                    <span className="text-cyan-400 font-bold">Celery + Redis</span>
-                  </div>
-                </div>
+                <ol className="space-y-3 text-xs text-slate-400 list-decimal list-inside leading-relaxed">
+                  <li>Open your WordPress Admin (`wp-admin`).</li>
+                  <li>Go to **TersoStudio → Command Center**.</li>
+                  <li>Describe your plugin requirements to the AI Coordinator.</li>
+                  <li>The 7-agent CrewAI backend generates, tests, and delivers the ready-to-install `.zip` plugin!</li>
+                </ol>
+              </div>
+
+              <div className="glass-card rounded-2xl p-6 border border-slate-800">
+                <h3 className="text-sm font-bold text-white mb-3">Download WordPress Client</h3>
+                <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+                  Download <code className="text-cyan-400 font-mono">tersostudio.zip</code> to install on your WordPress sites.
+                </p>
+                <Link href="/api-keys" className="block text-center text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl transition shadow-md">
+                  Get API Key & Download Package ↗
+                </Link>
               </div>
             </div>
           </div>
@@ -318,7 +240,7 @@ export default function UserDashboard() {
           <div className="max-w-3xl mx-auto space-y-8">
             <div className="glass-card rounded-2xl p-8 border border-slate-800 shadow-2xl">
               <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                <Settings className="w-5 h-5 text-indigo-400" /> Account Profile & Credentials
+                <Settings className="w-5 h-5 text-indigo-400" /> Account Profile Settings
               </h2>
 
               {saveSuccess && (
