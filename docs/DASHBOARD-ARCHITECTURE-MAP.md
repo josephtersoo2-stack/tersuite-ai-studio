@@ -1,96 +1,155 @@
-# Tersuite AI Studio — Django Backend Dashboard Architecture Map
+# Tersuite AI Studio — Revised Dashboard Architecture Map
 
-**Document Version:** 1.0.0  
-**Scope:** Django Backend Data Authority & Dashboard Metric Mapping  
-
----
-
-## 1. Executive Summary
-
-This architecture map establishes the exact source of truth for every metric displayed in the **Tersuite AI Studio Dashboard**. Before implementing backend aggregation services or API views, every metric must be traced back to an authoritative Django model, database query, or service layer.
-
-Metrics that lack a database model in the existing backend are explicitly marked as **NOT CURRENTLY AVAILABLE**, along with recommendations for clean implementation without duplicating existing logic.
+**Document Version:** 2.0.0 (Revised Post-Audit)  
+**Scope:** Authoritative Data Source Mapping, Availability Classification, and Aggregation Architecture  
+**Rule:** Dashboard is an observability and aggregation layer. No core business domain models or business logic may be prematurely created inside Module 01.  
 
 ---
 
-## 2. Complete Metric Architecture Map
+## 1. Architectural Principles & Constraints
 
-### A. Platform & User Overview
-
-| Dashboard Requirement | Existing Django Component | Model / Source | Query / Expression | API Endpoint | Status |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Total Users** | `django.contrib.auth` | `User` | `User.objects.count()` | `GET /api/v1/dashboard/overview/` | **AVAILABLE** |
-| **Active Users** | `django.contrib.auth` | `User` | `User.objects.filter(is_active=True).count()` | `GET /api/v1/dashboard/overview/` | **AVAILABLE** |
-| **Suspended Users** | `django.contrib.auth` | `User` | `User.objects.filter(is_active=False).count()` | `GET /api/v1/dashboard/overview/` | **AVAILABLE** |
-| **New Users Today** | `django.contrib.auth` | `User` | `User.objects.filter(date_joined__date=timezone.now().date()).count()` | `GET /api/v1/dashboard/overview/` | **AVAILABLE** |
-| **New Users This Month**| `django.contrib.auth` | `User` | `User.objects.filter(date_joined__month=timezone.now().month).count()` | `GET /api/v1/dashboard/overview/` | **AVAILABLE** |
-
----
-
-### B. Project Statistics
-
-| Dashboard Requirement | Existing Django Component | Model / Source | Query / Expression | API Endpoint | Status |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Total Projects** | `api` app | `Project` | `Project.objects.count()` | `GET /api/v1/dashboard/projects/` | **AVAILABLE** |
-| **Active / Running Projects** | `api` app | `Project` | `Project.objects.filter(status='running').count()` | `GET /api/v1/dashboard/projects/` | **AVAILABLE** |
-| **Completed Projects** | `api` app | `Project` | `Project.objects.filter(status='completed').count()` | `GET /api/v1/dashboard/projects/` | **AVAILABLE** |
-| **Failed Projects** | `api` app | `Project` | `Project.objects.filter(status='failed').count()` | `GET /api/v1/dashboard/projects/` | **AVAILABLE** |
-| **Draft Projects** | `api` app | `Project` | `Project.objects.filter(status='draft').count()` | `GET /api/v1/dashboard/projects/` | **AVAILABLE** |
-| **Projects by Category** | `api` app | `Project` + `Category` | `Category.objects.annotate(project_count=Count('projects'))` | `GET /api/v1/dashboard/projects/` | **AVAILABLE** |
+1. **Pure Aggregation Layer**: The Dashboard consumes authoritative data from existing Django models and services. It does not own primary domain state.
+2. **Zero Premature Model Creation**: The following models belong to future modules and MUST NOT be created in Module 01:
+   - `ProductionPlan` (Module 06 — Production Plan)
+   - `ProductionSession` (Module 07 — Production Session)
+   - `ProductionTask` (Module 06 / 07 — Task Graph & Sessions)
+   - `AIUsageRecord` / Token Ledger (Module 12 — Usage & Subscription)
+   - `ActivityLog` (Module 13 — Activity & Notifications)
+   - `DeliveryPackage` (Module 10 — Deliveries)
+3. **Exact Field & Choice Fidelity**: Metrics must strictly reflect the actual Django models in the codebase:
+   - `Project.status` choices: `draft`, `running`, `testing`, `completed`, `failed`.
+   - `UserSubscription.status` choices: `active`, `pending`, `cancelled`.
+   - `User.is_active=False` represents **Inactive Users** (the model does not explicitly define suspension).
+4. **Timezone-Aware Date Ranges**: All date filtering must use timezone-aware datetime boundaries (`timezone.now()`) to prevent multi-year range leaks.
+5. **Provider-Agnostic Infrastructure Diagnostics**: LLM provider diagnostics query the `llm_registry` app dynamically and verify configured environment variables across all active providers without hardcoding Google Gemini or OpenAI.
+6. **Factual Realtime / WebSocket Diagnostics**: Realtime connection health is evaluated by pinging the Django Channels Redis channel layer via `channels.layers.get_channel_layer()`. No client connection health is fabricated.
 
 ---
 
-### C. Subscriptions & Billing
+## 2. Global Metric Classification Matrix
 
-| Dashboard Requirement | Existing Django Component | Model / Source | Query / Expression | API Endpoint | Status |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Active Subscriptions** | `subscriptions` app | `UserSubscription` | `UserSubscription.objects.filter(status='active').count()` | `GET /api/v1/dashboard/billing/` | **AVAILABLE** |
-| **Pending Subscriptions**| `subscriptions` app | `UserSubscription` | `UserSubscription.objects.filter(status='pending').count()` | `GET /api/v1/dashboard/billing/` | **AVAILABLE** |
-| **Credits Remaining** | `subscriptions` app | `UserSubscription` | `UserSubscription.objects.aggregate(total=Sum('credits_remaining'))` | `GET /api/v1/dashboard/billing/` | **AVAILABLE** |
-| **Credit Purchases** | `subscriptions` app | `CreditPurchase` | `CreditPurchase.objects.filter(status='completed')` | `GET /api/v1/dashboard/billing/` | **AVAILABLE** |
-| **Revenue / Sales Total** | `subscriptions` app | `CreditPurchase` | `CreditPurchase.objects.filter(status='completed').aggregate(total=Sum('amount'))` | `GET /api/v1/dashboard/billing/` | **AVAILABLE** |
-
----
-
-### D. LLM Provider & Model Registry
-
-| Dashboard Requirement | Existing Django Component | Model / Source | Query / Expression | API Endpoint | Status |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Configured Providers** | `llm_registry` app | `LLMProvider` | `LLMProvider.objects.filter(enabled=True)` | `GET /api/v1/dashboard/health/` | **AVAILABLE** |
-| **Enabled Models** | `llm_registry` app | `LLMModel` | `LLMModel.objects.filter(enabled=True)` | `GET /api/v1/dashboard/health/` | **AVAILABLE** |
-| **Default Model** | `llm_registry` app | `LLMModel` | `LLMModel.objects.filter(is_default=True).first()` | `GET /api/v1/dashboard/health/` | **AVAILABLE** |
+Every proposed Dashboard metric is classified under one of five strict availability statuses:
+- **`AVAILABLE_NOW`**: Fully supported by existing Django models/services in the codebase.
+- **`PARTIALLY_AVAILABLE`**: Supported via existing model fields, but lacks historical trend tables or sub-field breakdowns.
+- **`AVAILABLE_AFTER_LATER_MODULE`**: Requires models/services to be built in a designated future module.
+- **`REQUIRES_NEW_INFRASTRUCTURE`**: Requires external infrastructure integration (e.g., Celery Redis inspect, sandbox daemon).
+- **`NOT_SUPPORTED`**: Excluded from scope as no authoritative underlying data source exists or will exist.
 
 ---
 
-### E. System Health & Infrastructure
+## 3. Comprehensive Architecture Map Table
 
-| Dashboard Requirement | Existing Django Component | Model / Source | Query / Expression | API Endpoint | Status |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Database Connection** | Django Core | `django.db.connection` | `connection.ensure_connection()` check | `GET /api/v1/dashboard/health/` | **AVAILABLE** |
-| **Redis / Cache** | Django Core | `django.core.cache.cache` | `cache.set('ping', 'pong', 5)` ping test | `GET /api/v1/dashboard/health/` | **AVAILABLE** |
-| **LLM Provider Ping** | `api.views.LLMTestView` | Google Gemini API Ping | Live HTTP test via `requests.post()` | `GET /api/v1/dashboard/health/` | **AVAILABLE** |
-| **Celery Worker Health** | `core.celery` | Celery Inspect | `celery_app.control.inspect().ping()` | `GET /api/v1/dashboard/health/` | **AVAILABLE** |
+| Metric | Source Model / Service | Query / Service Logic | Current Availability | Future Owning Module | API Endpoint | Cache Requirements | Time-Range Support | Permission Requirements | Security Sensitivity |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Total Users** | `django.contrib.auth.models.User` | `User.objects.count()` | `AVAILABLE_NOW` | Module 02 — Users | `GET /api/v1/dashboard/overview/` | 300s Redis Cache | No | Staff / Admin | Low |
+| **Active Users** | `django.contrib.auth.models.User` | `User.objects.filter(is_active=True).count()` | `AVAILABLE_NOW` | Module 02 — Users | `GET /api/v1/dashboard/overview/` | 300s Redis Cache | No | Staff / Admin | Low |
+| **Inactive Users** | `django.contrib.auth.models.User` | `User.objects.filter(is_active=False).count()` | `AVAILABLE_NOW` | Module 02 — Users | `GET /api/v1/dashboard/overview/` | 300s Redis Cache | No | Staff / Admin | Low |
+| **New Users (Range)** | `django.contrib.auth.models.User` | `User.objects.filter(date_joined__gte=start, date_joined__lt=end).count()` | `AVAILABLE_NOW` | Module 02 — Users | `GET /api/v1/dashboard/overview/` | 300s Redis Cache | Yes (`today`, `7d`, `30d`, `90d`, `ytd`, `custom`) | Staff / Admin | Low |
+| **Total Projects** | `api.models.Project` | `Project.objects.filter(user=user).count()` | `AVAILABLE_NOW` | Module 03 — Projects | `GET /api/v1/dashboard/overview/` | No Cache (Realtime) | Yes (`today`, `7d`, `30d`, `90d`, `ytd`, `custom`) | Authenticated User | Low |
+| **Projects (Draft)** | `api.models.Project` | `Project.objects.filter(user=user, status='draft').count()` | `AVAILABLE_NOW` | Module 03 — Projects | `GET /api/v1/dashboard/overview/` | No Cache (Realtime) | Yes | Authenticated User | Low |
+| **Projects (Running)** | `api.models.Project` | `Project.objects.filter(user=user, status='running').count()` | `AVAILABLE_NOW` | Module 03 — Projects | `GET /api/v1/dashboard/overview/` | No Cache (Realtime) | Yes | Authenticated User | Low |
+| **Projects (Testing)** | `api.models.Project` | `Project.objects.filter(user=user, status='testing').count()` | `AVAILABLE_NOW` | Module 03 — Projects | `GET /api/v1/dashboard/overview/` | No Cache (Realtime) | Yes | Authenticated User | Low |
+| **Projects (Completed)**| `api.models.Project` | `Project.objects.filter(user=user, status='completed').count()` | `AVAILABLE_NOW` | Module 03 — Projects | `GET /api/v1/dashboard/overview/` | No Cache (Realtime) | Yes | Authenticated User | Low |
+| **Projects (Failed)** | `api.models.Project` | `Project.objects.filter(user=user, status='failed').count()` | `AVAILABLE_NOW` | Module 03 — Projects | `GET /api/v1/dashboard/overview/` | No Cache (Realtime) | Yes | Authenticated User | Low |
+| **Projects by Category** | `api.models.Category` & `Project` | `Category.objects.annotate(count=Count('projects', filter=Q(projects__user=user)))` | `AVAILABLE_NOW` | Module 03 — Projects | `GET /api/v1/dashboard/overview/` | 60s Redis Cache | No | Authenticated User | Low |
+| **Active Subscription** | `subscriptions.models.UserSubscription` | `UserSubscription.objects.get(user=user)` | `AVAILABLE_NOW` | Module 12 — Usage & Subscription | `GET /api/v1/dashboard/overview/` | 60s Redis Cache | No | Authenticated User | Medium |
+| **Credits Remaining** | `subscriptions.models.UserSubscription` | `sub.credits_remaining` | `AVAILABLE_NOW` | Module 12 — Usage & Subscription | `GET /api/v1/dashboard/overview/` | No Cache (Realtime) | No | Authenticated User | Medium |
+| **Credit Purchases** | `subscriptions.models.CreditPurchase` | `CreditPurchase.objects.filter(user=user, status='completed')` | `AVAILABLE_NOW` | Module 12 — Usage & Subscription | `GET /api/v1/dashboard/overview/` | 60s Redis Cache | Yes | Authenticated User | Sensitive |
+| **Revenue Total** | `subscriptions.models.CreditPurchase` | `CreditPurchase.objects.filter(status='completed').aggregate(total=Sum('amount'))` | `AVAILABLE_NOW` | Module 12 — Usage & Subscription | `GET /api/v1/dashboard/overview/` | 300s Redis Cache | Yes | Staff / Admin | High (Confidential) |
+| **LLM Providers Status**| `llm_registry.models.LLMProvider` | `LLMProvider.objects.filter(enabled=True)` + `os.getenv(env_var)` check | `AVAILABLE_NOW` | Module 14 — Settings & System | `GET /api/v1/dashboard/health/` | 60s Redis Cache | No | Authenticated User | Medium (Hide Keys) |
+| **LLM Models Registry** | `llm_registry.models.LLMModel` | `LLMModel.objects.filter(enabled=True).select_related('provider')` | `AVAILABLE_NOW` | Module 14 — Settings & System | `GET /api/v1/dashboard/health/` | 300s Redis Cache | No | Authenticated User | Low |
+| **Database Health** | `django.db.connection` | Execute `SELECT 1` with connection pool status | `AVAILABLE_NOW` | Module 14 — Settings & System | `GET /api/v1/dashboard/health/` | No Cache (Realtime) | No | Authenticated User | Low |
+| **Redis Cache Health** | `django.core.cache.cache` | Execute test write/read `cache.set('ping', 'pong', 5)` | `AVAILABLE_NOW` | Module 14 — Settings & System | `GET /api/v1/dashboard/health/` | No Cache (Realtime) | No | Authenticated User | Low |
+| **WebSocket Layer Health**| `channels.layers` | Inspect `get_channel_layer()` connection readiness | `PARTIALLY_AVAILABLE` | Module 14 — Settings & System | `GET /api/v1/dashboard/health/` | No Cache (Realtime) | No | Authenticated User | Low |
+| **Celery Queue Depth** | Celery Broker Inspect | `celery_app.control.inspect().active()` | `REQUIRES_NEW_INFRASTRUCTURE` | Module 14 — Settings & System | `GET /api/v1/dashboard/health/` | 15s Redis Cache | No | Staff / Admin | Medium |
+| **Production Plans** | Nonexistent in DB | Requires `ProductionPlan` table | `AVAILABLE_AFTER_LATER_MODULE` | Module 06 — Production Plan | `GET /api/v1/dashboard/overview/` | N/A | N/A | N/A | N/A |
+| **Production Sessions** | Nonexistent in DB | Requires `ProductionSession` table | `AVAILABLE_AFTER_LATER_MODULE` | Module 07 — Production Session | `GET /api/v1/dashboard/overview/` | N/A | N/A | N/A | N/A |
+| **Token Usage Ledger** | Nonexistent in DB | Requires `TokenUsageRecord` table | `AVAILABLE_AFTER_LATER_MODULE` | Module 12 — Usage & Subscription | `GET /api/v1/dashboard/overview/` | N/A | N/A | N/A | N/A |
+| **Durable Activity Log** | Nonexistent in DB | Requires `ActivityLog` table | `AVAILABLE_AFTER_LATER_MODULE` | Module 13 — Activity & Notifications | `GET /api/v1/dashboard/activity/` | N/A | N/A | N/A | N/A |
+| **Delivery Packages** | Derived from `Project.files` | Derived from completed project JSON | `PARTIALLY_AVAILABLE` | Module 10 — Deliveries | `GET /api/v1/dashboard/overview/` | 60s Redis Cache | Yes | Authenticated User | Low |
+| **Sandbox Execution Audit**| Nonexistent in DB | Requires `SandboxReport` table | `AVAILABLE_AFTER_LATER_MODULE` | Module 11 — Site Integration | `GET /api/v1/dashboard/health/` | N/A | N/A | N/A | N/A |
 
 ---
 
-### F. Currently Unavailable Metrics (Requires Model / Audit Notes)
+## 4. Time-Range Filtering Architecture
 
-| Dashboard Requirement | Current Status | Reason | Recommendation |
-| :--- | :--- | :--- | :--- |
-| **Production Plans** | **NOT CURRENTLY AVAILABLE** | No persistent `ProductionPlan` table exists in backend DB. Generations execute via `tasks.py` threading directly. | Implement `ProductionPlan` & `ProductionSession` models in `api.models` to persist plans and user approvals. |
-| **Task Graph Execution Log**| **NOT CURRENTLY AVAILABLE** | Task graph progress is currently stored transiently inside `Project.last_result` JSON. | Create `ProductionTask` model to track per-agent progress (`running`, `completed`, `failed`) and dependencies. |
-| **Detailed Token Usage** | **NOT CURRENTLY AVAILABLE** | Token counts per generation are logged in stdout/celery output, not aggregated per model in DB. | Add `token_input_count` and `token_output_count` fields to `Project` / `ProductionSession`. |
-| **Durable Activity Log** | **NOT CURRENTLY AVAILABLE** | System events are not stored in a central `ActivityLog` model. | Add `ActivityLog` model in `api` app to store events (`project_created`, `plan_approved`, `delivery_ready`). |
-| **Package Deliveries** | **PARTIALLY AVAILABLE** | `Project.files` holds generated code JSON, but standalone `DeliveryPackage` table does not exist. | Aggregate completed projects as deliveries in API response until a formal delivery model is added. |
+To ensure consistent date filtering across user stats, project creation rates, and revenue metrics without preventing future custom range queries, all aggregation queries must accept standard query parameters:
+
+```text
+GET /api/v1/dashboard/overview/?period=30d
+GET /api/v1/dashboard/overview/?start_date=2026-08-01T00:00:00Z&end_date=2026-08-11T23:59:59Z
+```
+
+### Supported Period Identifiers:
+1. `today`: From `timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)` to `now()`.
+2. `7d`: From `now() - timedelta(days=7)` to `now()`.
+3. `30d` (Default): From `now() - timedelta(days=30)` to `now()`.
+4. `90d`: From `now() - timedelta(days=90)` to `now()`.
+5. `ytd`: From `now().replace(month=1, day=1, hour=0, minute=0, second=0)` to `now()`.
+6. `custom`: Evaluates ISO 8601 strings provided in `start_date` and `end_date`.
 
 ---
 
-## 3. Recommended Backend Architecture & Endpoints
+## 5. Metric Comparison & Trend Contract Architecture
 
-To serve the Dashboard efficiently without breaking existing contracts or introducing N+1 queries, we recommend adding an optimized aggregation view layer in `api/views_dashboard.py`:
+Metrics with comparison support must return a standardized structured comparison object. Values must never be fabricated; if previous period data is unavailable, `previous_value` and `change_percent` return `null`.
 
-* **`GET /api/v1/dashboard/overview/`**: Aggregates total projects, active sessions, completed builds, subscription counts, and usage credits.
-* **`GET /api/v1/dashboard/health/`**: Runs fast connection checks across DB, Redis, Gemini/LLM provider, Celery, and WebSocket.
-* **`GET /api/v1/dashboard/activity/`**: Returns recent project updates and system events.
+```json
+{
+  "total_projects": {
+    "value": 24,
+    "previous_value": 18,
+    "change_percent": 33.33,
+    "trend": "up"
+  }
+}
+```
 
-All metrics will be derived directly from PostgreSQL using Django ORM aggregation (`Count`, `Sum`, `Filter`) with Redis caching where appropriate.
+### Calculation Rules:
+* `change_percent = ((value - previous_value) / previous_value) * 100` (when `previous_value > 0`).
+* `trend` values: `"up"` (positive change), `"down"` (negative change), `"neutral"` (zero change or null).
+
+---
+
+## 6. Freshness & Caching Envelope Standard
+
+All Dashboard API responses must be wrapped in a standardized envelope providing explicit metadata regarding generation time, caching state, and execution latency:
+
+```json
+{
+  "meta": {
+    "generated_at": "2026-08-11T22:10:00.123456Z",
+    "cached": false,
+    "cache_ttl_seconds": 0,
+    "period": "30d",
+    "query_time_ms": 14.2
+  },
+  "data": {
+    "overview": {},
+    "projects": {},
+    "usage": {},
+    "attention": []
+  }
+}
+```
+
+---
+
+## 7. Versioned API Endpoint Boundaries
+
+The Dashboard API is strictly bounded to three consolidated aggregation endpoints under `/api/v1/dashboard/`:
+
+1. **`GET /api/v1/dashboard/overview/`**
+   - Consolidates: User stats (staff), Project counts by status/category, User Subscription & Credits, Revenue summary (staff), and Actionable Alerts.
+2. **`GET /api/v1/dashboard/health/`**
+   - Consolidates: Infrastructure status for PostgreSQL DB, Redis Cache, dynamic LLM Providers registry check, and Django Channels Redis layer.
+3. **`GET /api/v1/dashboard/activity/`**
+   - Consolidates: Chronological project timeline feed based on actual `Project.updated_at` records.
+
+---
+
+## 8. Security, Isolation & Sensitivity Rules
+
+1. **Authentication Guard**: All endpoints require `rest_framework.permissions.IsAuthenticated`.
+2. **Data Isolation**: Non-staff users only receive metrics for projects where `user = request.user`. Staff members (`is_staff=True`) receive platform-wide totals.
+3. **Secret Masking**: `api_base_url` and `api_key_env_var` names may be exposed to admins, but raw API key values, environment variable secret strings, database passwords, and auth tokens are **STRICTLY EXCLUDED** from all response serializers.

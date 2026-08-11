@@ -1,12 +1,9 @@
-from django.urls import path
+from django.urls import path, include
 from rest_framework.authtoken.views import obtain_auth_token
-from . import views, views_dashboard
+from . import views
 
 urlpatterns = [
-    path("dashboard/", views_dashboard.DashboardOverviewView.as_view(), name="dashboard"),
-    path("dashboard/overview/", views_dashboard.DashboardOverviewView.as_view(), name="dashboard-overview"),
-    path("dashboard/health/", views_dashboard.DashboardHealthView.as_view(), name="dashboard-health"),
-    path("dashboard/activity/", views_dashboard.DashboardActivityView.as_view(), name="dashboard-activity"),
+    path("dashboard/", include("api.urls_dashboard")),
     path("categories/", views.CategoryListCreateView.as_view(), name="categories"),
     path("categories/<uuid:id>/", views.CategoryDetailView.as_view(), name="category-detail"),
     path("projects/", views.ProjectListCreateView.as_view(), name="projects"),
