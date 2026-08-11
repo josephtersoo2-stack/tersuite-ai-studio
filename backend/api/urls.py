@@ -4,6 +4,7 @@ from . import views
 
 urlpatterns = [
     path("dashboard/", include("api.urls_dashboard")),
+    path("users/", include("api.urls_users")),
     path("categories/", views.CategoryListCreateView.as_view(), name="categories"),
     path("categories/<uuid:id>/", views.CategoryDetailView.as_view(), name="category-detail"),
     path("projects/", views.ProjectListCreateView.as_view(), name="projects"),
