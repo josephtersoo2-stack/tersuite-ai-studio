@@ -16,7 +16,7 @@ class TERSOSTUDIO_AI_Gateway {
     }
 
     public function get_backend_url(): string {
-        $url = get_option( 'tersostudio_backend_url', 'http://localhost:8000/api' );
+        $url = get_option( 'tersostudio_backend_url', 'http://127.0.0.1:8000/api' );
         return trailingslashit( trim( $url ) );
     }
 

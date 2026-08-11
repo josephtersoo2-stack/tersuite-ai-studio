@@ -71,7 +71,7 @@ class TERSOSTUDIO_REST_Projects_Controller extends WP_REST_Controller {
 
     private function get_backend_config(): array {
         return [
-            'url'   => trailingslashit( trim( get_option( 'tersostudio_backend_url', 'http://localhost:8000/api' ) ) ),
+            'url'   => trailingslashit( trim( get_option( 'tersostudio_backend_url', 'http://127.0.0.1:8000/api' ) ) ),
             'token' => trim( get_option( 'tersostudio_api_key', 'ec33c4db14d5bffcc6d3c8c0e81595e3bd020622' ) ),
         ];
     }

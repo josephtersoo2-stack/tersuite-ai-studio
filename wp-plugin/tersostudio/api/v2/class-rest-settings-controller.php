@@ -48,7 +48,7 @@ class TERSOSTUDIO_REST_Settings_Controller extends WP_REST_Controller {
 
     public function retrieve_settings( WP_REST_Request $request ): WP_REST_Response {
         $settings = [
-            'backend_url' => (string) get_option( 'tersostudio_backend_url', 'http://localhost:8000/api' ),
+            'backend_url' => (string) get_option( 'tersostudio_backend_url', 'http://127.0.0.1:8000/api' ),
             'api_key'     => (string) get_option( 'tersostudio_api_key', 'ec33c4db14d5bffcc6d3c8c0e81595e3bd020622' ),
         ];
 
@@ -69,7 +69,7 @@ class TERSOSTUDIO_REST_Settings_Controller extends WP_REST_Controller {
     }
 
     public function test_backend_connection( WP_REST_Request $request ): WP_REST_Response {
-        $backend_url = trailingslashit( trim( (string) get_option( 'tersostudio_backend_url', 'http://localhost:8000/api' ) ) );
+        $backend_url = trailingslashit( trim( (string) get_option( 'tersostudio_backend_url', 'http://127.0.0.1:8000/api' ) ) );
         $api_key     = trim( (string) get_option( 'tersostudio_api_key', 'ec33c4db14d5bffcc6d3c8c0e81595e3bd020622' ) );
 
         $response = wp_remote_get( $backend_url . 'projects/', [

@@ -25,7 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                     type="url"
                     id="ts-backend-url"
                     required
-                    placeholder="http://localhost:8000/api"
+                    placeholder="http://127.0.0.1:8000/api"
                     style="width: 100%; background: #020617; color: #38bdf8; border: 1px solid #334155; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 13px;"
                 />
             </div>

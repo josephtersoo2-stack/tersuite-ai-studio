@@ -56,7 +56,7 @@ class TERSOSTUDIO_Admin_Controller {
         $state = [
             'rest_url'    => esc_url_raw( rest_url( 'tersostudio/v2' ) ),
             'nonce'       => wp_create_nonce( 'wp_rest' ),
-            'backend_url' => get_option( 'tersostudio_backend_url', 'http://localhost:8000/api' ),
+            'backend_url' => get_option( 'tersostudio_backend_url', 'http://127.0.0.1:8000/api' ),
             'api_key'     => get_option( 'tersostudio_api_key', 'ec33c4db14d5bffcc6d3c8c0e81595e3bd020622' ),
         ];
 
@@ -77,7 +77,7 @@ class TERSOSTUDIO_Admin_Controller {
         wp_localize_script( 'tersostudio-workbench-js', 'TERSOSTUDIO_State', [
             'rest_url'    => esc_url_raw( rest_url( 'tersostudio/v2' ) ),
             'nonce'       => wp_create_nonce( 'wp_rest' ),
-            'backend_url' => get_option( 'tersostudio_backend_url', 'http://localhost:8000/api' ),
+            'backend_url' => get_option( 'tersostudio_backend_url', 'http://127.0.0.1:8000/api' ),
             'api_key'     => get_option( 'tersostudio_api_key', 'ec33c4db14d5bffcc6d3c8c0e81595e3bd020622' ),
         ] );
     }
