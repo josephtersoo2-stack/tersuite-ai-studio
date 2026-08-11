@@ -42,6 +42,7 @@ require_once TERSUITE_AI_DIR . 'includes/class-subscription-manager.php';
 require_once TERSUITE_AI_DIR . 'includes/class-activity-manager.php';
 require_once TERSUITE_AI_DIR . 'includes/class-notification-manager.php';
 require_once TERSUITE_AI_DIR . 'includes/class-websocket-client.php';
+require_once TERSUITE_AI_DIR . 'includes/class-dashboard-manager.php';
 require_once TERSUITE_AI_DIR . 'includes/class-asset-manager.php';
 require_once TERSUITE_AI_DIR . 'includes/class-ajax.php';
 require_once TERSUITE_AI_DIR . 'includes/class-admin-menu.php';

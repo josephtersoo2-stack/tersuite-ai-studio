@@ -137,8 +137,8 @@ class Tersuite_AI_AJAX {
 
     public function dashboard() {
         $this->guard();
-        $api = new Tersuite_AI_API_Client();
-        $this->respond($api->get('api/v1/dashboard'));
+        $manager = new Tersuite_AI_Dashboard_Manager();
+        $this->respond($manager->get_summary());
     }
 
     public function projects() {
