@@ -3,6 +3,7 @@ import json
 import logging
 import time
 import os
+import threading
 import requests
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -108,18 +109,21 @@ class StartAgentPipelineView(APIView):
             project = Project.objects.get(id=project_id, user=request.user)
         except Project.DoesNotExist:
             return Response({"error": "Project not found"}, status=404)
+
         task = str(request.data.get("task") or project.description or "Create a WordPress plugin")
         project.status = "running"
         project.error_message = ""
         project.save(update_fields=["status", "error_message", "updated_at"])
 
-        try:
-            run_agent_pipeline(str(project.id), task)
-        except Exception as e:
-            logger.exception("Pipeline error: %s", e)
+        # Execute generation in background thread to return HTTP response immediately (<200ms)
+        t = threading.Thread(target=run_agent_pipeline, args=(str(project.id), task), daemon=True)
+        t.start()
 
-        project.refresh_from_db()
-        return Response({"status": project.status, "project_id": str(project.id), "message": "Agent pipeline executed."})
+        return Response({
+            "status": "started",
+            "project_id": str(project.id),
+            "message": "AI Architect pipeline engaged. Generating plugin code...",
+        })
 
 
 class AgentProgressStreamView(APIView):

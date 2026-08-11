@@ -140,6 +140,8 @@ export function WorkspaceMainLayoutShell() {
         .then(data => {
             if (data.status === 'started' || data.status === 'running' || data.success) {
                 addLog('AI Agent pipeline engaged! Generating plugin architecture and code...');
+                const aiMsg = { role: 'ai', text: '🤖 I am analyzing your request and generating the plugin architecture & code. Watch the telemetry log below for step-by-step progress!', time: new Date().toLocaleTimeString() };
+                setChatHistory(prev => [...prev, aiMsg]);
                 pollProgress(selectedProjectId);
             } else {
                 setIsGenerating(false);
@@ -171,7 +173,7 @@ export function WorkspaceMainLayoutShell() {
                         fetch(restUrl + '/chat/deliver/' + pId, { headers: { 'X-WP-Nonce': nonce } })
                             .then(r => r.json())
                             .then(deliv => {
-                                if (deliv.files) {
+                                if (deliv.files && Object.keys(deliv.files).length > 0) {
                                     setFiles(deliv.files);
                                     const firstFile = Object.keys(deliv.files)[0];
                                     setActiveFileName(firstFile);
