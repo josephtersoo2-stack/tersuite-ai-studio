@@ -10,6 +10,7 @@ urlpatterns = [
     path("projects/<uuid:project_id>/start/", views.StartAgentPipelineView.as_view(), name="start-pipeline"),
     path("projects/<uuid:project_id>/stream/", views.AgentProgressStreamView.as_view(), name="agent-stream"),
     path("projects/<uuid:project_id>/deliver/", views.DeliverPluginView.as_view(), name="deliver-plugin"),
+    path("llm/test/", views.LLMTestView.as_view(), name="llm-test"),
     path("auth/login/", obtain_auth_token, name="api-token-auth"),
     path("auth/register/", views.RegisterView.as_view(), name="register"),
 ]

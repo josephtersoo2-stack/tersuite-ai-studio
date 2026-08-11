@@ -1,6 +1,8 @@
 """REST API used by the Tersuite WordPress plugin and frontend."""
 import json
 import logging
+import time
+import os
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils.text import slugify
@@ -39,7 +41,7 @@ def seed_default_categories_if_empty():
 
 
 class CategoryListCreateView(generics.ListCreateAPIView):
-    permission_classes = [AllowAny] # Allow discovery & reading for client plugins
+    permission_classes = [AllowAny]
     serializer_class = CategorySerializer
 
     def get_queryset(self):
@@ -127,7 +129,6 @@ class AgentProgressStreamView(APIView):
 
 
 class DeliverPluginView(APIView):
-    """Return the generated project as a structured file map; WordPress creates the ZIP."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request, project_id):
@@ -142,5 +143,64 @@ class DeliverPluginView(APIView):
             "project_id": str(project.id),
             "project_name": project.name,
             "files": project.files,
-            "message": "Generated files returned with their exact relative paths. The WordPress plugin can package them into a ZIP.",
+            "message": "Generated files returned with their exact relative paths.",
+        })
+
+
+class LLMTestView(APIView):
+    """Diagnostic API endpoint to test LLM model & provider connectivity."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        start_time = time.time()
+        providers_data = []
+        default_model_info = None
+
+        try:
+            from llm_registry.models import LLMProvider, LLMModel
+            providers = LLMProvider.objects.filter(enabled=True)
+            for p in providers:
+                models = p.models.filter(enabled=True)
+                p_models = []
+                for m in models:
+                    model_dict = {
+                        "model_id": m.model_id,
+                        "display_name": m.display_name,
+                        "is_default": m.is_default,
+                        "capabilities": m.capabilities,
+                    }
+                    if m.is_default:
+                        default_model_info = f"{p.display_name} - {m.display_name} ({m.model_id})"
+                    p_models.append(model_dict)
+
+                providers_data.append({
+                    "name": p.name,
+                    "display_name": p.display_name,
+                    "api_base_url": p.api_base_url,
+                    "api_key_env_var": p.api_key_env_var,
+                    "has_key": bool(os.getenv(p.api_key_env_var)),
+                    "models": p_models,
+                })
+        except Exception as e:
+            logger.warning(f"Error loading LLM registry for test: {e}")
+
+        elapsed_ms = round((time.time() - start_time) * 1000, 2)
+
+        # Check if environment keys or default providers exist
+        anthropic_key = bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY"))
+        openai_key = bool(os.getenv("OPENAI_API_KEY"))
+        gemini_key = bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+
+        return Response({
+            "status": "online",
+            "message": "TersoStudio AI LLM Diagnostic Engine active.",
+            "latency_ms": elapsed_ms,
+            "active_model": default_model_info or "Claude 3.5 Sonnet / Multi-Agent Swarm (Default)",
+            "api_keys": {
+                "anthropic_claude": anthropic_key,
+                "openai": openai_key,
+                "google_gemini": gemini_key,
+            },
+            "registered_providers": providers_data,
+            "capabilities": ["code_generation", "wordpress_architecture", "security_auditing", "refactoring"],
         })

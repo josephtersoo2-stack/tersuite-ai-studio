@@ -40,6 +40,19 @@ class TERSOSTUDIO_REST_Settings_Controller extends WP_REST_Controller {
                 'permission_callback' => [ $this, 'verify_access_clearance' ]
             ]
         ] );
+
+        register_rest_route( $this->namespace, '/' . $this->rest_base . '/test-llm', [
+            [
+                'methods'             => WP_REST_Server::READABLE,
+                'callback'            => [ $this, 'test_llm_connection' ],
+                'permission_callback' => [ $this, 'verify_access_clearance' ]
+            ],
+            [
+                'methods'             => WP_REST_Server::CREATABLE,
+                'callback'            => [ $this, 'test_llm_connection' ],
+                'permission_callback' => [ $this, 'verify_access_clearance' ]
+            ]
+        ] );
     }
 
     public function verify_access_clearance( WP_REST_Request $request ): bool {
@@ -87,5 +100,24 @@ class TERSOSTUDIO_REST_Settings_Controller extends WP_REST_Controller {
         }
 
         return TERSOSTUDIO_REST_Response_Factory::error( 'API Authorization Error (HTTP Code ' . $code . '). Please check API Key credentials.', 'auth_error', $code );
+    }
+
+    public function test_llm_connection( WP_REST_Request $request ): WP_REST_Response {
+        $backend_url = trailingslashit( trim( (string) get_option( 'tersostudio_backend_url', 'http://127.0.0.1:8000/api' ) ) );
+        $api_key     = trim( (string) get_option( 'tersostudio_api_key', 'ec33c4db14d5bffcc6d3c8c0e81595e3bd020622' ) );
+
+        $response = wp_remote_get( $backend_url . 'llm/test/', [
+            'headers' => [ 'Authorization' => 'Token ' . $api_key ],
+            'timeout' => 15,
+        ] );
+
+        if ( is_wp_error( $response ) ) {
+            return TERSOSTUDIO_REST_Response_Factory::error( 'LLM Test Failed: ' . $response->get_error_message(), 'llm_test_failed', 500 );
+        }
+
+        $code = wp_remote_retrieve_response_code( $response );
+        $body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        return new WP_REST_Response( $body, $code );
     }
 }
