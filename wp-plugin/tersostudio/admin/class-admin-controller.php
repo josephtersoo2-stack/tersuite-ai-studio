@@ -11,6 +11,7 @@ class TERSOSTUDIO_Admin_Controller {
     private function __construct() {
         add_action( 'admin_menu', [ $this, 'register_admin_submenu_hierarchy' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_workbench_assets' ] );
+        add_action( 'admin_head', [ $this, 'inject_global_script_state' ] );
     }
 
     public static function get_instance(): TERSOSTUDIO_Admin_Controller {
@@ -46,6 +47,22 @@ class TERSOSTUDIO_Admin_Controller {
         }
     }
 
+    public function inject_global_script_state(): void {
+        $screen = get_current_screen();
+        if ( ! $screen || strpos( $screen->id, 'tersostudio' ) === false ) {
+            return;
+        }
+
+        $state = [
+            'rest_url'    => esc_url_raw( rest_url( 'tersostudio/v2' ) ),
+            'nonce'       => wp_create_nonce( 'wp_rest' ),
+            'backend_url' => get_option( 'tersostudio_backend_url', 'http://localhost:8000/api' ),
+            'api_key'     => get_option( 'tersostudio_api_key', 'ec33c4db14d5bffcc6d3c8c0e81595e3bd020622' ),
+        ];
+
+        echo '<script>window.TERSOSTUDIO_State = ' . wp_json_encode( $state ) . ';</script>';
+    }
+
     public function enqueue_workbench_assets( string $hook ): void {
         if ( strpos( $hook, 'tersostudio' ) === false ) {
             return;
@@ -56,6 +73,13 @@ class TERSOSTUDIO_Admin_Controller {
         wp_enqueue_code_editor( array( 'type' => 'text/x-php' ) );
         wp_enqueue_style( 'wp-codemirror' );
         wp_enqueue_script( 'tersostudio-workbench-js', TERSOSTUDIO_URL . 'admin/build/index.js', [ 'wp-element', 'jquery' ], TERSOSTUDIO_VERSION, true );
+
+        wp_localize_script( 'tersostudio-workbench-js', 'TERSOSTUDIO_State', [
+            'rest_url'    => esc_url_raw( rest_url( 'tersostudio/v2' ) ),
+            'nonce'       => wp_create_nonce( 'wp_rest' ),
+            'backend_url' => get_option( 'tersostudio_backend_url', 'http://localhost:8000/api' ),
+            'api_key'     => get_option( 'tersostudio_api_key', 'ec33c4db14d5bffcc6d3c8c0e81595e3bd020622' ),
+        ] );
     }
 
     public function render_command_center_view(): void {

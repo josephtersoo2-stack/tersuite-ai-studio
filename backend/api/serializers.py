@@ -1,14 +1,23 @@
+from django.utils.text import slugify
 from rest_framework import serializers
 from .models import Project, Category
 
 
 class CategorySerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
+    slug = serializers.SlugField(required=False, allow_blank=True)
 
     class Meta:
         model = Category
         fields = ["id", "name", "slug", "description", "color", "created_at"]
         read_only_fields = ["id", "created_at"]
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            data = data.copy()
+            if "name" in data and not data.get("slug"):
+                data["slug"] = slugify(data["name"])
+        return super().to_internal_value(data)
 
 
 class ProjectSerializer(serializers.ModelSerializer):
