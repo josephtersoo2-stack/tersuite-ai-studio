@@ -108,14 +108,18 @@ class StartAgentPipelineView(APIView):
             project = Project.objects.get(id=project_id, user=request.user)
         except Project.DoesNotExist:
             return Response({"error": "Project not found"}, status=404)
-        if project.status == "running":
-            return Response({"status": "running", "project_id": str(project.id)})
         task = str(request.data.get("task") or project.description or "Create a WordPress plugin")
         project.status = "running"
         project.error_message = ""
         project.save(update_fields=["status", "error_message", "updated_at"])
-        run_agent_pipeline.delay(str(project.id), task)
-        return Response({"status": "started", "project_id": str(project.id), "message": "Agent pipeline started."})
+
+        try:
+            run_agent_pipeline(str(project.id), task)
+        except Exception as e:
+            logger.exception("Pipeline error: %s", e)
+
+        project.refresh_from_db()
+        return Response({"status": project.status, "project_id": str(project.id), "message": "Agent pipeline executed."})
 
 
 class AgentProgressStreamView(APIView):
