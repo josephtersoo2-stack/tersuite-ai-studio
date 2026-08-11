@@ -45,7 +45,7 @@ class DashboardOverviewView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         # User-isolated cache lookup
-        cache_key = build_cache_key("overview", request.user, period_label)
+        cache_key = build_cache_key("overview", request.user, period_label, start_dt, end_dt)
         cached_payload = get_cached_dashboard_data(cache_key)
 
         if cached_payload is not None:

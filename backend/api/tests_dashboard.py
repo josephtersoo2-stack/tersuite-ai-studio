@@ -1,18 +1,22 @@
 from datetime import timedelta
+from unittest.mock import patch
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.core.cache import cache
 from rest_framework.test import APIClient
 from rest_framework.authtoken.models import Token
 from api.models import Project, Category
 from subscriptions.models import UserSubscription, CreditPurchase, SubscriptionPlan
 from llm_registry.models import LLMProvider, LLMModel
+from api.services.dashboard.health import check_database_health
 
 User = get_user_model()
 
 
 class ComprehensiveDashboardTestCase(TestCase):
     def setUp(self):
+        cache.clear()
         self.client = APIClient()
         self.staff_client = APIClient()
         self.user_b_client = APIClient()
@@ -153,7 +157,22 @@ class ComprehensiveDashboardTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["meta"]["period"], "custom")
 
-    # 6. Infrastructure Health Diagnostic Tests
+    # 6. User-Isolated Caching & Custom Range Cache Isolation
+    def test_cache_hit_and_user_isolation(self):
+        # First call populates cache
+        r1 = self.client.get("/api/v1/dashboard/overview/")
+        self.assertFalse(r1.data["meta"]["cached"])
+
+        # Second call hits cache
+        r2 = self.client.get("/api/v1/dashboard/overview/")
+        self.assertTrue(r2.data["meta"]["cached"])
+
+        # User B call MUST NOT hit User A's cache
+        r_b = self.user_b_client.get("/api/v1/dashboard/overview/")
+        self.assertFalse(r_b.data["meta"]["cached"])
+        self.assertEqual(r_b.data["data"]["projects"]["total_projects"]["value"], 1)
+
+    # 7. Infrastructure Health Diagnostic Tests
     def test_health_endpoint(self):
         response = self.client.get("/api/v1/dashboard/health/")
         self.assertEqual(response.status_code, 200)
@@ -163,16 +182,23 @@ class ComprehensiveDashboardTestCase(TestCase):
         self.assertTrue(len(services["llm_providers"]) >= 1)
         self.assertIn("channels", services)
 
-    # 7. Activity Timeline Tests
+    # 8. Activity Timeline Tests
     def test_activity_endpoint(self):
         response = self.client.get("/api/v1/dashboard/activity/")
         self.assertEqual(response.status_code, 200)
         self.assertIn("events", response.data["data"])
         self.assertTrue(len(response.data["data"]["events"]) >= 5)
 
-    # 8. Unbuilt Future Module Declarations Test
+    # 9. Unbuilt Future Module Declarations Test
     def test_future_modules_declarations(self):
         response = self.client.get("/api/v1/dashboard/overview/")
         future = response.data["data"]["future_modules"]
         self.assertIn("production_plans", future)
         self.assertEqual(future["production_plans"]["status"], "available_after_later_module")
+
+    # 10. Database Failure Graceful Health Handling Test
+    @patch("api.services.dashboard.health.connection.cursor")
+    def test_database_health_failure_handling(self, mock_cursor):
+        mock_cursor.side_effect = Exception("DB Connection Refused")
+        res = check_database_health()
+        self.assertEqual(res["status"], "unhealthy")
