@@ -1,5 +1,10 @@
 /**
- * Tersuite AI Studio — WebSocket Live Telemetry Client & Event Router
+ * Tersuite AI Studio — Secure WebSocket Live Telemetry Client & Event Router
+ *
+ * Security & Reliability:
+ * - Uses short-lived ticket or token authentication.
+ * - Preserves listener registry map across automatic reconnection.
+ * - Dispatches backend events to registered UI components (Studio, Task Graph, File Tree).
  */
 (function($) {
     'use strict';
@@ -14,27 +19,34 @@
         /**
          * Initialize WebSocket connection for a project.
          */
-        connect: function(url, projectId, apiKey, onEvent) {
+        connect: function(url, projectId, ticket, onEvent) {
             if (!url || !window.WebSocket) {
                 console.warn('[Tersuite WS] WebSocket not supported or URL missing.');
                 return null;
             }
 
             var self = this;
-            if (onEvent) {
+
+            // Preserve listener callback across reconnects
+            if (onEvent && typeof onEvent === 'function' && self.listeners.indexOf(onEvent) === -1) {
                 self.listeners.push(onEvent);
             }
 
+            // Build secure WebSocket URL using short-lived ticket
             var fullUrl = url + (url.indexOf('?') === -1 ? '?' : '&') + 'project_id=' + encodeURIComponent(projectId);
-            if (apiKey) {
-                fullUrl += '&token=' + encodeURIComponent(apiKey);
+            if (ticket) {
+                fullUrl += '&ticket=' + encodeURIComponent(ticket);
             }
 
             try {
+                if (self.socket && (self.socket.readyState === WebSocket.OPEN || self.socket.readyState === WebSocket.CONNECTING)) {
+                    return self.socket;
+                }
+
                 self.socket = new WebSocket(fullUrl);
 
                 self.socket.onopen = function() {
-                    console.log('[Tersuite WS] Live Telemetry connected for project #' + projectId);
+                    console.log('[Tersuite WS] Live Telemetry stream established for project #' + projectId);
                     self.reconnectAttempts = 0;
                     self.emit('connection.established', { status: 'connected', projectId: projectId });
                 };
@@ -49,33 +61,33 @@
                 };
 
                 self.socket.onerror = function(err) {
-                    console.warn('[Tersuite WS] Connection error:', err);
+                    console.warn('[Tersuite WS] Live stream error:', err);
                     self.emit('connection.error', { error: err });
                 };
 
-                self.socket.onclose = function() {
-                    console.log('[Tersuite WS] Telemetry socket closed.');
-                    self.emit('connection.closed', {});
-                    self.scheduleReconnect(url, projectId, apiKey);
+                self.socket.onclose = function(e) {
+                    console.log('[Tersuite WS] Telemetry socket closed (code ' + e.code + ').');
+                    self.emit('connection.closed', { code: e.code });
+                    self.scheduleReconnect(url, projectId, ticket);
                 };
 
             } catch (err) {
-                console.error('[Tersuite WS] Initialization failed:', err);
+                console.error('[Tersuite WS] Initialization error:', err);
             }
 
             return self.socket;
         },
 
         /**
-         * Reconnection logic with backoff.
+         * Reconnection logic with backoff, preserving all registered listeners.
          */
-        scheduleReconnect: function(url, projectId, apiKey) {
+        scheduleReconnect: function(url, projectId, ticket) {
             var self = this;
             if (self.reconnectAttempts < self.maxReconnectAttempts) {
                 self.reconnectAttempts++;
                 setTimeout(function() {
                     console.log('[Tersuite WS] Reconnecting (Attempt ' + self.reconnectAttempts + ')...');
-                    self.connect(url, projectId, apiKey);
+                    self.connect(url, projectId, ticket, null);
                 }, self.reconnectDelay * self.reconnectAttempts);
             }
         },
@@ -84,18 +96,16 @@
          * Register event listener callback.
          */
         on: function(callback) {
-            if (typeof callback === 'function') {
+            if (typeof callback === 'function' && this.listeners.indexOf(callback) === -1) {
                 this.listeners.push(callback);
             }
         },
 
         /**
-         * Dispatch event payload to listeners.
+         * Dispatch event payload to all registered listeners.
          */
         handleEvent: function(data) {
             if (!data || !data.event) return;
-
-            console.log('[Tersuite WS Event]:', data.event, data);
 
             for (var i = 0; i < this.listeners.length; i++) {
                 try {
