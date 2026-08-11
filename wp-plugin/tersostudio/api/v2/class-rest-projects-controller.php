@@ -20,6 +20,7 @@ class TERSOSTUDIO_REST_Projects_Controller extends WP_REST_Controller {
     }
 
     public function register_routes(): void {
+        // Projects Routes
         register_rest_route( $this->namespace, '/' . $this->rest_base, [
             [
                 'methods'             => WP_REST_Server::READABLE,
@@ -33,18 +34,32 @@ class TERSOSTUDIO_REST_Projects_Controller extends WP_REST_Controller {
             ]
         ] );
 
-        register_rest_route( $this->namespace, '/' . $this->rest_base . '/upload', [
+        register_rest_route( $this->namespace, '/' . $this->rest_base . '/(?P<id>[a-zA-Z0-9-]+)', [
             [
-                'methods'             => WP_REST_Server::CREATABLE,
-                'callback'            => [ $this, 'upload_project_zip' ],
+                'methods'             => WP_REST_Server::DELETABLE,
+                'callback'            => [ $this, 'delete_project' ],
                 'permission_callback' => [ $this, 'verify_access_clearance' ]
             ]
         ] );
 
-        register_rest_route( $this->namespace, '/' . $this->rest_base . '/delete', [
+        // Categories Routes
+        register_rest_route( $this->namespace, '/categories', [
+            [
+                'methods'             => WP_REST_Server::READABLE,
+                'callback'            => [ $this, 'get_categories' ],
+                'permission_callback' => [ $this, 'verify_access_clearance' ]
+            ],
             [
                 'methods'             => WP_REST_Server::CREATABLE,
-                'callback'            => [ $this, 'execute_cascading_project_deletion' ],
+                'callback'            => [ $this, 'create_category' ],
+                'permission_callback' => [ $this, 'verify_access_clearance' ]
+            ]
+        ] );
+
+        register_rest_route( $this->namespace, '/categories/(?P<id>[a-zA-Z0-9-]+)', [
+            [
+                'methods'             => WP_REST_Server::DELETABLE,
+                'callback'            => [ $this, 'delete_category' ],
                 'permission_callback' => [ $this, 'verify_access_clearance' ]
             ]
         ] );
@@ -54,174 +69,120 @@ class TERSOSTUDIO_REST_Projects_Controller extends WP_REST_Controller {
         return current_user_can( 'manage_options' );
     }
 
+    private function get_backend_config(): array {
+        return [
+            'url'   => trailingslashit( trim( get_option( 'tersostudio_backend_url', 'http://localhost:8000/api' ) ) ),
+            'token' => trim( get_option( 'tersostudio_api_key', 'ec33c4db14d5bffcc6d3c8c0e81595e3bd020622' ) ),
+        ];
+    }
+
     public function get_projects( WP_REST_Request $request ): WP_REST_Response {
-        if ( TERSOSTUDIO_Rate_Limit_Gate::check_throttle( 'get_projects', 45, 60 ) ) {
-            return TERSOSTUDIO_REST_Response_Factory::error( 'Rate limit reached.', 'rate_limit_exceeded', 429 );
+        $config = $this->get_backend_config();
+        $response = wp_remote_get( $config['url'] . 'projects/', [
+            'headers' => [ 'Authorization' => 'Token ' . $config['token'] ],
+            'timeout' => 15,
+        ] );
+
+        if ( is_wp_error( $response ) ) {
+            return TERSOSTUDIO_REST_Response_Factory::error( $response->get_error_message(), 'connection_error', 500 );
         }
 
-        global $wpdb;
-        $table = $wpdb->prefix . 'ts_projects';
-        
-        $query = $wpdb->prepare( "SELECT id, name, slug, category_slug, created_at FROM {$table} ORDER BY id DESC", [] );
-        $results = $wpdb->get_results( $query, ARRAY_A );
-
-        $wp_categories = get_categories( [ 'hide_empty' => false ] );
-        $formatted_cats = [];
-        foreach ( $wp_categories as $cat ) {
-            $formatted_cats[] = [ 'slug' => $cat->slug, 'name' => $cat->name ];
-        }
-
-        if ( ! function_exists( 'get_plugins' ) ) {
-            require_once ABSPATH . 'wp-admin/includes/plugin.php';
-        }
-        $plugins_list = [];
-        foreach ( get_plugins() as $plugin_path => $plugin_meta ) {
-            $plugins_list[] = [ 'path' => $plugin_path, 'name' => $plugin_meta['Name'], 'folder' => dirname( $plugin_path ) ];
-        }
-
-        return TERSOSTUDIO_REST_Response_Factory::success( 'Project lists fetched successfully.', [ 'projects' => is_array( $results ) ? $results : [], 'categories' => $formatted_cats, 'plugins' => $plugins_list ] );
+        $body = json_decode( wp_remote_retrieve_body( $response ), true );
+        return rest_ensure_response( $body );
     }
 
     public function create_project( WP_REST_Request $request ): WP_REST_Response {
-        if ( TERSOSTUDIO_Rate_Limit_Gate::check_throttle( 'create_project', 15, 60 ) ) {
-            return TERSOSTUDIO_REST_Response_Factory::error( 'Rate limit reached.', 'rate_limit_exceeded', 429 );
+        $config = $this->get_backend_config();
+        $params = $request->get_json_params() ?: $request->get_params();
+
+        $response = wp_remote_post( $config['url'] . 'projects/', [
+            'headers' => [
+                'Authorization' => 'Token ' . $config['token'],
+                'Content-Type'  => 'application/json',
+            ],
+            'body'    => wp_json_encode( $params ),
+            'timeout' => 20,
+        ] );
+
+        if ( is_wp_error( $response ) ) {
+            return TERSOSTUDIO_REST_Response_Factory::error( $response->get_error_message(), 'connection_error', 500 );
         }
 
-        $nonce = $request->get_header( 'X-WP-Nonce' );
-        if ( ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
-            return TERSOSTUDIO_REST_Response_Factory::error( 'Security check failed.', 'security_check_failed', 403 );
-        }
+        $code = wp_remote_retrieve_response_code( $response );
+        $body = json_decode( wp_remote_retrieve_body( $response ), true );
 
-        $name = sanitize_text_field( $request->get_param( 'name' ) );
-        $slug = sanitize_title( $request->get_param( 'slug' ) ?: $name );
-        $category_slug = sanitize_key( $request->get_param( 'category_slug' ) ?: 'uncategorized' );
-        $source_plugin = sanitize_text_field( $request->get_param( 'source_plugin' ) );
-
-        if ( empty( $name ) ) {
-            return TERSOSTUDIO_REST_Response_Factory::error( 'Project Name required.', 'missing_parameters', 400 );
-        }
-
-        $container = TERSOSTUDIO_Service_Container::get_instance();
-        $repo = $container->make( 'project_state_repo' );
-        $fs   = $container->make( 'filesystem_gate' );
-
-        $result = $repo->create_project( $name, $slug, $category_slug );
-        if ( ! $result['success'] ) return TERSOSTUDIO_REST_Response_Factory::error( $result['message'], 'db_error', 500 );
-
-        $project_id = $result['data']['project_id'];
-        
-        try {
-            $upload_dir = wp_upload_dir();
-            $sandbox_path = trailingslashit( $upload_dir['basedir'] ) . 'tersostudio/workspace/project-' . $project_id . '/';
-            $fs->mkdir( $sandbox_path );
-
-            if ( ! empty( $source_plugin ) && '.' !== $source_plugin ) {
-                require_once TERSOSTUDIO_PATH . 'core/Database/class-project-ingestion-service.php';
-                TERSOSTUDIO_Project_Ingestion_Service::get_instance()->process_local_directory_ingestion( $project_id, $source_plugin, $sandbox_path, $slug );
-            }
-        } catch ( \Throwable $e ) {
-            $this->perform_emergency_rollback( $project_id );
-            return TERSOSTUDIO_REST_Response_Factory::error( 'Staging process exception encountered. Workspace creation aborted and rolled back securely: ' . $e->getMessage(), 'ingestion_failure', 500 );
-        }
-
-        return TERSOSTUDIO_REST_Response_Factory::success( 'Project workspace state provisioned successfully.', [ 'project_id' => $project_id ], 211 );
+        return new WP_REST_Response( $body, $code );
     }
 
-    public function upload_project_zip( WP_REST_Request $request ): WP_REST_Response {
-        if ( TERSOSTUDIO_Rate_Limit_Gate::check_throttle( 'upload_zip', 10, 60 ) ) {
-            return TERSOSTUDIO_REST_Response_Factory::error( 'Rate limit reached.', 'rate_limit_exceeded', 429 );
+    public function delete_project( WP_REST_Request $request ): WP_REST_Response {
+        $config = $this->get_backend_config();
+        $id = $request->get_param( 'id' );
+
+        $response = wp_remote_request( $config['url'] . 'projects/' . $id . '/', [
+            'method'  => 'DELETE',
+            'headers' => [ 'Authorization' => 'Token ' . $config['token'] ],
+            'timeout' => 15,
+        ] );
+
+        if ( is_wp_error( $response ) ) {
+            return TERSOSTUDIO_REST_Response_Factory::error( $response->get_error_message(), 'connection_error', 500 );
         }
 
-        $nonce = $request->get_header( 'X-WP-Nonce' );
-        if ( ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
-            return TERSOSTUDIO_REST_Response_Factory::error( 'Security check failed.', 'security_check_failed', 403 );
-        }
-
-        $name = sanitize_text_field( $request->get_param( 'name' ) );
-        $slug = sanitize_title( $request->get_param( 'slug' ) ?: $name );
-        $category_slug = sanitize_key( $request->get_param( 'category_slug' ) ?: 'uncategorized' );
-
-        if ( empty( $name ) || empty( $_FILES['plugin_zip'] ) ) {
-            return TERSOSTUDIO_REST_Response_Factory::error( 'Project context parameters or script zip archives omitted.', 'missing_parameters', 400 );
-        }
-
-        $file = $_FILES['plugin_zip'];
-        
-        require_once ABSPATH . 'wp-admin/includes/file.php';
-        $file_check = wp_check_filetype_and_ext( $file['tmp_name'], $file['name'] );
-        $ext  = empty( $file_check['ext'] ) ? pathinfo( $file['name'], PATHINFO_EXTENSION ) : $file_check['ext'];
-        $type = empty( $file_check['type'] ) ? '' : $file_check['type'];
-        
-        $allowed_zip_mimes = [ 'application/zip', 'application/x-zip-compressed', 'multipart/x-zip', 'application/x-zip' ];
-        if ( 'zip' !== strtolower( $ext ) || ( ! empty( $type ) && ! in_array( $type, $allowed_zip_mimes, true ) ) ) {
-            return TERSOSTUDIO_REST_Response_Factory::error( 'Invalid upload formatting contract: file must pass strict application/zip content attestation verification.', 'invalid_format', 400 );
-        }
-
-        $container = TERSOSTUDIO_Service_Container::get_instance();
-        $repo = $container->make( 'project_state_repo' );
-        $fs   = $container->make( 'filesystem_gate' );
-
-        $result = $repo->create_project( $name, $slug, $category_slug );
-        if ( ! $result['success'] ) return TERSOSTUDIO_REST_Response_Factory::error( $result['message'], 'db_error', 500 );
-
-        $project_id = $result['data']['project_id'];
-        
-        try {
-            $upload_dir = wp_upload_dir();
-            $sandbox_path = trailingslashit( $upload_dir['basedir'] ) . 'tersostudio/workspace/project-' . $project_id . '/';
-            $fs->mkdir( $sandbox_path );
-
-            require_once TERSOSTUDIO_PATH . 'core/Database/class-project-ingestion-service.php';
-            $status = TERSOSTUDIO_Project_Ingestion_Service::get_instance()->process_zip_package_ingestion( $project_id, $file, $sandbox_path, $slug );
-
-            if ( ! $status ) {
-                throw new \Exception( 'Package decompressed block structure synchronization fault encountered.' );
-            }
-        } catch ( \Throwable $e ) {
-            $this->perform_emergency_rollback( $project_id );
-            return TERSOSTUDIO_REST_Response_Factory::error( 'ZIP file extraction ingestion failed. Fragmented assets rolled back securely: ' . $e->getMessage(), 'ingestion_fault', 500 );
-        }
-
-        return TERSOSTUDIO_REST_Response_Factory::success( 'ZIP context successfully uploaded, stripped of asset noise, and indexed to RAG tables.', [ 'project_id' => $project_id ], 201 );
+        return rest_ensure_response( [ 'success' => true ] );
     }
 
-    private function perform_emergency_rollback( int $project_id ): void {
-        global $wpdb;
-        $container = TERSOSTUDIO_Service_Container::get_instance();
-        $fs = $container->make( 'filesystem_gate' );
-        $upload_dir = wp_upload_dir();
-        
-        if ( $fs ) {
-            $fs->delete( trailingslashit( $upload_dir['basedir'] ) . 'tersostudio/workspace/project-' . $project_id . '/', true );
-            $fs->delete( trailingslashit( $upload_dir['basedir'] ) . 'tersostudio/snapshots/project-' . $project_id . '/', true );
+    public function get_categories( WP_REST_Request $request ): WP_REST_Response {
+        $config = $this->get_backend_config();
+        $response = wp_remote_get( $config['url'] . 'categories/', [
+            'headers' => [ 'Authorization' => 'Token ' . $config['token'] ],
+            'timeout' => 15,
+        ] );
+
+        if ( is_wp_error( $response ) ) {
+            return TERSOSTUDIO_REST_Response_Factory::error( $response->get_error_message(), 'connection_error', 500 );
         }
-        
-        $wpdb->delete( $wpdb->prefix . 'ts_projects', [ 'id' => $project_id ], [ '%d' ] );
-        $wpdb->delete( $wpdb->prefix . 'ts_workspace_files', [ 'project_id' => $project_id ], [ '%d' ] );
-        $wpdb->delete( $wpdb->prefix . 'ts_chat_history', [ 'project_id' => $project_id ], [ '%d' ] );
-        $wpdb->delete( $wpdb->prefix . 'ts_snapshots', [ 'project_id' => $project_id ], [ '%d' ] );
-        
-        $job_ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$wpdb->prefix}ts_jobs WHERE project_id = %d", $project_id ) );
-        if ( ! empty( $job_ids ) ) {
-            $wpdb->query( "DELETE FROM {$wpdb->prefix}ts_event_journal WHERE job_id IN (" . implode( ',', array_map( 'intval', $job_ids ) ) . ")" );
-        }
-        $wpdb->delete( $wpdb->prefix . 'ts_jobs', [ 'project_id' => $project_id ], [ '%d' ] );
+
+        $body = json_decode( wp_remote_retrieve_body( $response ), true );
+        return rest_ensure_response( $body );
     }
 
-    public function execute_cascading_project_deletion( WP_REST_Request $request ): WP_REST_Response {
-        if ( TERSOSTUDIO_Rate_Limit_Gate::check_throttle( 'delete_project', 15, 60 ) ) {
-            return TERSOSTUDIO_REST_Response_Factory::error( 'Rate limit reached.', 'rate_limit_exceeded', 429 );
+    public function create_category( WP_REST_Request $request ): WP_REST_Response {
+        $config = $this->get_backend_config();
+        $params = $request->get_json_params() ?: $request->get_params();
+
+        $response = wp_remote_post( $config['url'] . 'categories/', [
+            'headers' => [
+                'Authorization' => 'Token ' . $config['token'],
+                'Content-Type'  => 'application/json',
+            ],
+            'body'    => wp_json_encode( $params ),
+            'timeout' => 15,
+        ] );
+
+        if ( is_wp_error( $response ) ) {
+            return TERSOSTUDIO_REST_Response_Factory::error( $response->get_error_message(), 'connection_error', 500 );
         }
 
-        global $wpdb;
-        $params = $request->get_json_params();
-        $project_id = intval( $params['project_id'] ?? 0 );
-        
-        if ( empty( $project_id ) ) {
-            return TERSOSTUDIO_REST_Response_Factory::error( 'Missing project target constraints.', 'missing_parameters', 400 );
+        $code = wp_remote_retrieve_response_code( $response );
+        $body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        return new WP_REST_Response( $body, $code );
+    }
+
+    public function delete_category( WP_REST_Request $request ): WP_REST_Response {
+        $config = $this->get_backend_config();
+        $id = $request->get_param( 'id' );
+
+        $response = wp_remote_request( $config['url'] . 'categories/' . $id . '/', [
+            'method'  => 'DELETE',
+            'headers' => [ 'Authorization' => 'Token ' . $config['token'] ],
+            'timeout' => 15,
+        ] );
+
+        if ( is_wp_error( $response ) ) {
+            return TERSOSTUDIO_REST_Response_Factory::error( $response->get_error_message(), 'connection_error', 500 );
         }
-        
-        $this->perform_emergency_rollback( $project_id );
-        return TERSOSTUDIO_REST_Response_Factory::success( 'Project workspace dropped cleanly from relational databases.' );
+
+        return rest_ensure_response( [ 'success' => true ] );
     }
 }
