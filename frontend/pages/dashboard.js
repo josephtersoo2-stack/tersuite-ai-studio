@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import Navbar from '../components/Navbar';
 import {
   LayoutDashboard, User, Key, Layers, Bot, ShieldCheck, CheckCircle2,
-  Copy, Check, RefreshCw, Cpu, Sparkles, Lock, Mail, Save, ExternalLink, Settings, Download
+  Copy, Check, RefreshCw, Cpu, Sparkles, Lock, Mail, Save, ExternalLink, Settings, Download, Trash2
 } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/';
@@ -57,6 +57,24 @@ export default function UserDashboard() {
       console.error('Error fetching projects:', err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleDeleteProject(projectId) {
+    if (!confirm('Are you sure you want to delete this generated plugin project? This action cannot be undone.')) return;
+    try {
+      const res = await fetch(API_BASE + `projects/${projectId}/`, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Token ' + token }
+      });
+      if (res.ok || res.status === 204 || res.status === 200) {
+        setProjects(prev => prev.filter(p => p.id !== projectId));
+      } else {
+        alert('Failed to delete project.');
+      }
+    } catch (err) {
+      console.error('Error deleting project:', err);
+      alert('Connection error deleting project.');
     }
   }
 
@@ -143,7 +161,7 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* TAB 1: READ-ONLY PLUGIN GENERATIONS HISTORY */}
+        {/* TAB 1: PLUGIN GENERATIONS HISTORY */}
         {activeTab === 'projects' && (
           <div className="grid lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
@@ -185,9 +203,18 @@ export default function UserDashboard() {
                             <h3 className="font-bold text-white text-base">{p.name || 'Untitled Plugin'}</h3>
                             <span className="text-[11px] text-slate-500 font-mono">UUID: #{p.id}</span>
                           </div>
-                          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> {p.status ? p.status.toUpperCase() : 'COMPLETED'}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> {p.status ? p.status.toUpperCase() : 'COMPLETED'}
+                            </span>
+                            <button
+                              onClick={() => handleDeleteProject(p.id)}
+                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition"
+                              title="Delete Generated Plugin"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
 
                         <p className="text-xs text-slate-400 mb-4 line-clamp-2 leading-relaxed">{p.description || 'No description recorded.'}</p>
