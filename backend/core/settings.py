@@ -1,13 +1,13 @@
 import os
 from pathlib import Path
 from urllib.parse import urlparse
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
-if not SECRET_KEY:
-    raise RuntimeError("DJANGO_SECRET_KEY must be set in production")
-DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-tersuite-ai-studio-local-dev-key-12345")
+DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "*").split(",") if h.strip()]
 CSRF_TRUSTED_ORIGINS = [u.strip() for u in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if u.strip()]
@@ -16,7 +16,7 @@ INSTALLED_APPS = [
     "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes",
     "django.contrib.sessions", "django.contrib.messages", "django.contrib.staticfiles",
     "channels", "rest_framework", "rest_framework.authtoken",
-    "llm_registry", "api", "subscriptions",
+    "core.apps.CoreConfig", "llm_registry.apps.LLMRegistryConfig", "api.apps.ApiConfig", "subscriptions.apps.SubscriptionsConfig",
 ]
 
 MIDDLEWARE = [
@@ -44,6 +44,8 @@ WSGI_APPLICATION = "core.wsgi.application"
 ASGI_APPLICATION = "core.asgi.application"
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+USE_SQLITE = os.getenv("USE_SQLITE", "True").lower() == "true"
+
 if DATABASE_URL:
     parsed = urlparse(DATABASE_URL)
     DATABASES = {"default": {
@@ -52,11 +54,16 @@ if DATABASE_URL:
         "HOST": parsed.hostname or "localhost", "PORT": str(parsed.port or 5432),
         "CONN_MAX_AGE": 60,
     }}
-else:
+elif not USE_SQLITE and os.getenv("DB_NAME"):
     DATABASES = {"default": {
         "ENGINE": "django.db.backends.postgresql", "NAME": os.getenv("DB_NAME", "tersuite"),
         "USER": os.getenv("DB_USER", "tersuite_user"), "PASSWORD": os.getenv("DB_PASSWORD", ""),
         "HOST": os.getenv("DB_HOST", "localhost"), "PORT": os.getenv("DB_PORT", "5432"),
+    }}
+else:
+    DATABASES = {"default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     }}
 
 AUTH_PASSWORD_VALIDATORS = [
