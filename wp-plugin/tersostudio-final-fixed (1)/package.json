@@ -1,0 +1,20 @@
+{
+  "name": "tersostudio-build-matrix",
+  "version": "2.0.0",
+  "description": "Enterprise multi-agent development engine build compilation workspace.",
+  "main": "admin/build/index.js",
+  "scripts": {
+    "start": "wp-scripts start --output-path=admin/build",
+    "build": "wp-scripts build --output-path=admin/build"
+  },
+  "keywords": [
+    "wordpress",
+    "swarm",
+    "orchestration"
+  ],
+  "author": "Joseph Tersoo",
+  "license": "GPL-2.0-or-later",
+  "devDependencies": {
+    "@wordpress/scripts": "^30.0.0"
+  }
+}

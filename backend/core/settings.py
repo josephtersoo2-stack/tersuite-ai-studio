@@ -15,11 +15,12 @@ CSRF_TRUSTED_ORIGINS = [u.strip() for u in os.getenv("CSRF_TRUSTED_ORIGINS", "")
 INSTALLED_APPS = [
     "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes",
     "django.contrib.sessions", "django.contrib.messages", "django.contrib.staticfiles",
-    "channels", "rest_framework", "rest_framework.authtoken",
+    "corsheaders", "channels", "rest_framework", "rest_framework.authtoken",
     "core.apps.CoreConfig", "llm_registry.apps.LLMRegistryConfig", "api.apps.ApiConfig", "subscriptions.apps.SubscriptionsConfig",
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -29,6 +30,8 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+CORS_ALLOW_ALL_ORIGINS = True
 ROOT_URLCONF = "core.urls"
 
 TEMPLATES = [{
