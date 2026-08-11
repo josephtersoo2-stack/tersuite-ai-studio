@@ -67,7 +67,7 @@ def build_llm_for_crew(config: Dict[str, Any]):
 class TersuiteAIStudioCoordinator:
     """CrewAI-based coordinator for plugin generation pipeline."""
 
-    def __init__(self, provider_name: str = "openai", model_name: Optional[str] = None, workspace_path: Optional[str] = None):
+    def __init__(self, provider_name: str = "gemini", model_name: Optional[str] = None, workspace_path: Optional[str] = None):
         config = get_llm_config(provider_name, model_name)
         self.workspace_path = workspace_path or "/tmp/tersuite"
         os.makedirs(self.workspace_path, exist_ok=True)
