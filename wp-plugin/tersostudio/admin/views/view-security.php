@@ -3,86 +3,141 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 ?>
-<div class="wrap">
-    <h1 style="margin-bottom: 24px; color: #1d2327;">Active Security Sentinel // Firewall Rules Matrix</h1>
-    
-    <div style="background: #1e1e1e; color: #fff; padding: 24px; border-radius: 8px; border: 1px solid #29292e; max-width: 800px;">
-        <h2 style="color: #fff; margin-top: 0; margin-bottom: 12px; color: #ef4444;">⛨️ Swarm Agent Sandbox Isolation Locks</h2>
-        <p style="color: #a7aaad; font-size: 13px; line-height: 1.5; margin-bottom: 24px;">
-            Define high-sensitivity string signatures and file paths below. If a Swarm Agent attempts to scan, read, or generate variations affecting these terms, the <code>Path_Validator</code> guard will drop the thread context instantly at the filesystem gateway boundary.
+<div class="wrap" style="max-width: 900px; margin: 20px auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <h1 style="color: #0f172a; font-weight: 800; font-size: 26px; margin-bottom: 20px;">
+        🔑 Backend API Credentials & Connection
+    </h1>
+
+    <div style="background: #0f172a; color: #f8fafc; padding: 28px; border-radius: 12px; border: 1px solid #1e293b; shadow: 0 10px 25px -5px rgba(0,0,0,0.3);">
+        <h2 style="color: #fff; margin-top: 0; margin-bottom: 8px; font-size: 18px; font-weight: 700; color: #38bdf8;">
+            🔌 Connect to Tersuite AI Studio Backend
+        </h2>
+        <p style="color: #94a3b8; font-size: 13px; line-height: 1.6; margin-bottom: 24px;">
+            Configure your Django API backend server URL and API Authentication Token. All project requests, agent chats, and plugin builds route through this connection.
         </p>
 
-        <div style="margin-bottom: 20px;">
-            <label style="display: block; font-weight: bold; margin-bottom: 8px; color: #f43f5e;">Hardlocked Sandbox No-Go Zones (Line-Separated):</label>
-            <textarea id="ts-security-nogo-textarea" rows="8" style="width: 100%; background: #2a2a2e; color: #fff; border: 1px solid #3c3c43; padding: 12px; border-radius: 4px; font-family: monospace; font-size: 13px; line-height: 1.6; resize: vertical; outline: none;" placeholder="wp-config.php
-.env
-wp-admin
-wp-includes
-.git
-.htaccess
-"></textarea>
-        </div>
+        <form id="ts-api-credentials-form" style="display: flex; flex-direction: column; gap: 20px;">
+            <div>
+                <label for="ts-backend-url" style="display: block; font-weight: 700; font-size: 13px; margin-bottom: 6px; color: #cbd5e1;">
+                    Backend API URL *
+                </label>
+                <input
+                    type="url"
+                    id="ts-backend-url"
+                    required
+                    placeholder="http://localhost:8000/api"
+                    style="width: 100%; background: #020617; color: #38bdf8; border: 1px solid #334155; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 13px;"
+                />
+            </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <button id="ts-save-security-rules-btn" class="button button-primary" style="height: 40px; padding: 0 24px; font-weight: bold; font-size: 13px; background: #dc2626; border: none; text-shadow: none;">Commit Firewall Constraints Matrix</button>
-            <span id="ts-security-feedback" style="font-family: monospace; font-size: 12px; font-weight: bold;"></span>
-        </div>
+            <div>
+                <label for="ts-api-key" style="display: block; font-weight: 700; font-size: 13px; margin-bottom: 6px; color: #cbd5e1;">
+                    API Key / DRF Token *
+                </label>
+                <input
+                    type="text"
+                    id="ts-api-key"
+                    required
+                    placeholder="ec33c4db14d5bffcc6d3c8c0e81595e3bd020622"
+                    style="width: 100%; background: #020617; color: #10b981; border: 1px solid #334155; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 13px;"
+                />
+                <span style="font-size: 11px; color: #64748b; margin-top: 6px; display: block;">
+                    Generate or copy your Token from the <a href="http://localhost:3000/api-keys" target="_blank" style="color: #818cf8;">User Web Dashboard ↗</a>
+                </span>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 10px;">
+                <button
+                    type="submit"
+                    id="ts-save-credentials-btn"
+                    class="button button-primary"
+                    style="background: #4f46e5; border: none; font-weight: bold; height: 42px; padding: 0 24px; border-radius: 8px; cursor: pointer;"
+                >
+                    💾 Save Credentials
+                </button>
+                <button
+                    type="button"
+                    id="ts-test-connection-btn"
+                    class="button"
+                    style="background: #1e293b; color: #38bdf8; border: 1px solid #334155; font-weight: bold; height: 42px; padding: 0 20px; border-radius: 8px; cursor: pointer;"
+                >
+                    ⚡ Test Backend Connection
+                </button>
+            </div>
+        </form>
+
+        <div id="ts-connection-feedback" style="margin-top: 20px; font-size: 13px; font-weight: 700;"></div>
     </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const S = window.TERSOSTUDIO_State || {};
-    const nogoTxt = document.getElementById('ts-security-nogo-textarea');
-    const saveBtn = document.getElementById('ts-save-security-rules-btn');
-    const feedback = document.getElementById('ts-security-feedback');
+    const restUrl = S.rest_url || '/wp-json/tersostudio/v2';
+    const nonce = S.nonce || '';
 
-    if (!nogoTxt || !saveBtn) return;
+    const backendUrlInput = document.getElementById('ts-backend-url');
+    const apiKeyInput     = document.getElementById('ts-api-key');
+    const form            = document.getElementById('ts-api-credentials-form');
+    const testBtn         = document.getElementById('ts-test-connection-btn');
+    const feedback        = document.getElementById('ts-connection-feedback');
 
-    // Load current sandbox rules
-    fetch(`${S.rest_url}/settings`, {
-        method: 'GET',
-        headers: { 'X-WP-Nonce': S.nonce }
-    })
-    .then(res => res.json())
-    .then(payload => {
-        if (payload.success && payload.data && payload.data.settings) {
-            nogoTxt.value = payload.data.settings.security_nogo_zones || '';
-        }
-    });
+    function loadCredentials() {
+        fetch(restUrl + '/settings', { headers: { 'X-WP-Nonce': nonce } })
+        .then(res => res.json())
+        .then(data => {
+            if (data.data && data.data.settings) {
+                backendUrlInput.value = data.data.settings.backend_url || 'http://localhost:8000/api';
+                apiKeyInput.value     = data.data.settings.api_key || 'ec33c4db14d5bffcc6d3c8c0e81595e3bd020622';
+            }
+        });
+    }
 
-    // Commit modifications over standardized REST factory lines
-    saveBtn.addEventListener('click', function() {
-        saveBtn.disabled = true;
-        feedback.textContent = 'Synchronizing security layers...';
-        feedback.style.color = '#eab308';
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        feedback.textContent = 'Saving API credentials...';
+        feedback.style.color = '#f59e0b';
 
-        fetch(`${S.rest_url}/settings`, {
+        fetch(restUrl + '/settings', {
             method: 'POST',
-            headers: {
-                'X-WP-Nonce': S.nonce,
-                'Content-Type': 'application/json'
-            },
+            headers: { 'X-WP-Nonce': nonce, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                security_nogo_zones: nogoTxt.value.trim()
+                backend_url: backendUrlInput.value.trim(),
+                api_key: apiKeyInput.value.trim()
             })
         })
         .then(res => res.json())
-        .then(payload => {
-            saveBtn.disabled = false;
-            if (payload.success) {
-                feedback.textContent = 'FIREWALL_LOCKED -> Security sentinel definitions compiled.';
-                feedback.style.color = '#34d399';
+        .then(data => {
+            if (data.success) {
+                feedback.textContent = '✓ Credentials saved successfully!';
+                feedback.style.color = '#10b981';
             } else {
-                feedback.textContent = 'REJECTED -> ' + payload.message;
-                feedback.style.color = '#f43f5e';
+                feedback.textContent = 'Error: ' + data.message;
+                feedback.style.color = '#ef4444';
             }
-        })
-        .catch(err => {
-            saveBtn.disabled = false;
-            feedback.textContent = 'EXCEPT -> ' + err.message;
-            feedback.style.color = '#f43f5e';
         });
     });
+
+    testBtn.addEventListener('click', function() {
+        feedback.textContent = 'Testing connection to Django API backend...';
+        feedback.style.color = '#38bdf8';
+
+        fetch(restUrl + '/settings/test-connection', {
+            method: 'POST',
+            headers: { 'X-WP-Nonce': nonce }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                feedback.textContent = '✓ ' + data.message;
+                feedback.style.color = '#10b981';
+            } else {
+                feedback.textContent = '❌ ' + (data.message || 'Connection test failed');
+                feedback.style.color = '#ef4444';
+            }
+        });
+    });
+
+    loadCredentials();
 });
 </script>

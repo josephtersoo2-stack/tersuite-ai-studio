@@ -24,6 +24,13 @@ class ProjectSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "description", "category", "category_id", "status", "files", "error_message", "created_at", "updated_at"]
         read_only_fields = ["id", "status", "files", "error_message", "created_at", "updated_at"]
 
+    def to_internal_value(self, data):
+        if isinstance(data, dict) and "category_id" in data:
+            if not data["category_id"] or data["category_id"] == "" or data["category_id"] == "null":
+                data = data.copy()
+                data["category_id"] = None
+        return super().to_internal_value(data)
+
     def create(self, validated_data):
         category_id = validated_data.pop("category_id", None)
         if category_id:
