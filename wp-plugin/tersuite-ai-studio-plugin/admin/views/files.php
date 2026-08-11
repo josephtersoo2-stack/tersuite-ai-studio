@@ -1,0 +1,6 @@
+<?php defined('ABSPATH') || exit; ?>
+<div class="wrap tsa-wrap">
+<?php include TERSUITE_AI_DIR.'admin/partials/sidebar.php'; ?>
+<div class="tsa-main"><div class="tsa-topbar-spacer"></div><?php include TERSUITE_AI_DIR.'admin/partials/header.php'; ?>
+<div class="tsa-content"><div class="tsa-page-head"><div><h1>Files</h1><p>Browse generated project files without losing their exact structure.</p></div></div><div class="tsa-files-layout"><div class="tsa-panel tsa-file-side"><div class="tsa-panel-head compact"><strong>PROJECT FILES</strong></div><div class="tsa-tree"><div class="tree-root">⌄ <span class="folder">MEMBERSHIP-MANAGER</span></div><div class="tree-indent">⌄ <span class="folder">includes</span><div class="tree-indent deeper selected"><span class="file">PHP</span> class-membership.php</div><div class="tree-indent deeper"><span class="file">PHP</span> class-api.php</div></div><div class="tree-indent">⌄ <span class="folder">admin</span><div class="tree-indent deeper"><span class="file">PHP</span> settings.php</div></div></div></div><div class="tsa-panel tsa-file-preview"><div class="tsa-breadcrumb">includes › class-membership.php</div><pre class="tsa-code">// File preview
+// Select a file to load its real content from Django.</pre></div></div></div></div></div>

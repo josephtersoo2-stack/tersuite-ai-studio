@@ -1,0 +1,5 @@
+<?php defined('ABSPATH') || exit; ?>
+<div class="wrap tsa-wrap">
+<?php include TERSUITE_AI_DIR.'admin/partials/sidebar.php'; ?>
+<div class="tsa-main"><div class="tsa-topbar-spacer"></div><?php include TERSUITE_AI_DIR.'admin/partials/header.php'; ?>
+<div class="tsa-content"><div class="tsa-page-head"><div><h1>Usage & Credits</h1><p>Your authoritative usage balance from Tersuite.</p></div></div><div class="tsa-stats-grid"><div class="tsa-stat-card"><span>Credits</span><strong>842</strong><small>/ 1,000</small></div><div class="tsa-stat-card"><span>Generations</span><strong>18</strong><small>/ 50</small></div><div class="tsa-stat-card"><span>Tokens</span><strong>2.4M</strong><small>this month</small></div><div class="tsa-stat-card"><span>Avg. Cost</span><strong>$0.42</strong><small>per generation</small></div></div><div class="tsa-panel"><div class="tsa-chart-placeholder"><span>Usage chart</span><div class="tsa-chart-bars"><i style="height:30%"></i><i style="height:52%"></i><i style="height:40%"></i><i style="height:74%"></i><i style="height:58%"></i><i style="height:88%"></i><i style="height:69%"></i><i style="height:94%"></i></div></div></div></div></div></div>

@@ -1,0 +1,4 @@
+jQuery(function($){
+ window.TSA={ajax:function(action,data){data=data||{}; data.action='tersuite_'+action; data.nonce=window.TersuiteAI?TersuiteAI.nonce:''; return $.ajax({url:window.TersuiteAI?TersuiteAI.ajaxUrl:ajaxurl,type:'POST',data:data});},toast:function(msg,type){var c=$('#tsa-toast'); if(!c.length){$('body').append('<div id="tsa-toast"></div>');c=$('#tsa-toast');} var el=$('<div class="tsa-toast-item '+(type||'info')+'"></div>').text(msg); c.append(el);setTimeout(function(){el.fadeOut(250,function(){$(this).remove();});},4500);}};
+ $('.tsa-mobile-menu').on('click',function(){$('.tsa-sidebar').toggleClass('open');});
+});
